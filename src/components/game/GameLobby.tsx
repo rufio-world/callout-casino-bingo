@@ -208,6 +208,15 @@ const GameLobby: React.FC<GameLobbyProps> = ({
                       onCheckedChange={(checked) => onUpdateSettings({ free_center: checked })}
                     />
                   </div>
+
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="visual-hints">Visual Number Hints</Label>
+                    <Switch
+                      id="visual-hints"
+                      checked={room.visual_hints}
+                      onCheckedChange={(checked) => onUpdateSettings({ visual_hints: checked })}
+                    />
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -240,6 +249,10 @@ const GameLobby: React.FC<GameLobbyProps> = ({
                   <div>
                     <div className="text-muted-foreground">Free Center</div>
                     <div className="font-semibold">{room.free_center ? 'Yes' : 'No'}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Visual Hints</div>
+                    <div className="font-semibold">{room.visual_hints ? 'Enabled' : 'Disabled'}</div>
                   </div>
                 </div>
 

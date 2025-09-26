@@ -212,9 +212,10 @@ const Game = () => {
     const number = card.numbers[numberIndex];
     
     // Check if number has been drawn or is FREE space
-    const numberDrawn = drawnNumbers.some(d => d.number === number) || number === 0;
+    const visualHintsEnabled = room?.visual_hints ?? true;
+    const numberDrawn = number === 0 || (visualHintsEnabled && drawnNumbers.some(d => d.number === number));
     
-    if (!numberDrawn) return;
+    if (!numberDrawn && visualHintsEnabled) return;
 
     const newMarkedPositions = [...card.marked_positions];
     newMarkedPositions[numberIndex] = !newMarkedPositions[numberIndex];
@@ -361,6 +362,7 @@ const Game = () => {
                 playerName="Your Card"
                 cardNumber={card.card_number}
                 disabled={!isGameActive}
+                visualHints={room?.visual_hints ?? true}
               />
             ))}
           </div>

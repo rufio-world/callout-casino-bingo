@@ -17,6 +17,7 @@ export const useGameManager = () => {
       cardsPerPlayer: number;
       freeCenter: boolean;
       maxPlayers: number;
+      visualHints: boolean;
     }
   ) => {
     setLoading(true);
@@ -74,7 +75,8 @@ export const useGameManager = () => {
           rounds_total: gameSettings?.roundsTotal || 5,
           cards_per_player: gameSettings?.cardsPerPlayer || 1,
           free_center: gameSettings?.freeCenter ?? true,
-          max_players: gameSettings?.maxPlayers || 10
+          max_players: gameSettings?.maxPlayers || 10,
+          visual_hints: gameSettings?.visualHints ?? true
         })
         .select()
         .single();

@@ -22,7 +22,8 @@ const ConfigureGame = () => {
     roundsTotal: 5,
     cardsPerPlayer: 1,
     freeCenter: true,
-    maxPlayers: 10
+    maxPlayers: 10,
+    visualHints: true
   });
 
   const handleCreateGame = async () => {
@@ -208,6 +209,25 @@ const ConfigureGame = () => {
                     }))}
                   />
                 </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="visualHints" className="font-semibold">
+                      Visual Number Hints
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Highlight matching numbers on cards
+                    </p>
+                  </div>
+                  <Switch
+                    id="visualHints"
+                    checked={gameSettings.visualHints}
+                    onCheckedChange={(checked) => setGameSettings(prev => ({ 
+                      ...prev, 
+                      visualHints: checked 
+                    }))}
+                  />
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -220,7 +240,7 @@ const ConfigureGame = () => {
                 Game Summary
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <CardContent className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
               <div>
                 <p className="text-2xl font-bold text-accent">{gameSettings.roundsTotal}</p>
                 <p className="text-sm text-muted-foreground">Rounds</p>
@@ -236,6 +256,10 @@ const ConfigureGame = () => {
               <div>
                 <p className="text-2xl font-bold text-accent">{gameSettings.freeCenter ? 'Yes' : 'No'}</p>
                 <p className="text-sm text-muted-foreground">Free Center</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-accent">{gameSettings.visualHints ? 'On' : 'Off'}</p>
+                <p className="text-sm text-muted-foreground">Visual Hints</p>
               </div>
             </CardContent>
           </Card>

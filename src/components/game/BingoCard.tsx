@@ -11,6 +11,7 @@ interface BingoCardProps {
   playerName: string;
   cardNumber?: number;
   disabled?: boolean;
+  visualHints?: boolean;
 }
 
 const BingoCard: React.FC<BingoCardProps> = ({
@@ -21,12 +22,13 @@ const BingoCard: React.FC<BingoCardProps> = ({
   isWinner,
   playerName,
   cardNumber = 1,
-  disabled = false
+  disabled = false,
+  visualHints = true
 }) => {
   const patterns = checkBingoPatterns(markedPositions);
   
   const isNumberDrawn = (number: number) => {
-    return number === 0 || drawnNumbers.includes(number); // 0 is FREE space
+    return number === 0 || (visualHints && drawnNumbers.includes(number)); // 0 is FREE space
   };
 
   const getNumberStatus = (number: number, index: number) => {

@@ -80,6 +80,7 @@ export type Database = {
           rounds_total: number | null
           status: Database["public"]["Enums"]["game_status"] | null
           updated_at: string | null
+          visual_hints: boolean | null
         }
         Insert: {
           cards_per_player?: number | null
@@ -95,6 +96,7 @@ export type Database = {
           rounds_total?: number | null
           status?: Database["public"]["Enums"]["game_status"] | null
           updated_at?: string | null
+          visual_hints?: boolean | null
         }
         Update: {
           cards_per_player?: number | null
@@ -110,6 +112,7 @@ export type Database = {
           rounds_total?: number | null
           status?: Database["public"]["Enums"]["game_status"] | null
           updated_at?: string | null
+          visual_hints?: boolean | null
         }
         Relationships: [
           {

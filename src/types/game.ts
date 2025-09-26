@@ -22,6 +22,7 @@ export interface GameRoom {
   rounds_completed: number;
   cards_per_player: number;
   free_center: boolean;
+  visual_hints: boolean;
   current_round_number: number;
   round_start_time?: string;
   created_at: string;
