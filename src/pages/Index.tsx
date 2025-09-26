@@ -12,7 +12,7 @@ import { getRandomAvatar, AVATAR_OPTIONS } from '@/lib/avatars';
 import { useGameManager } from '@/hooks/useGameManager';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import bingoBackground from '@/assets/bingo-bg.jpg';
+import bingoBackground from '@/assets/bingo-verse-bg.jpg';
 
 const Index = () => {
   const [playerName, setPlayerName] = useState('');
@@ -98,16 +98,16 @@ const Index = () => {
 
           <h1 className="text-6xl font-bold mb-4">
             <span className="bg-gradient-casino bg-clip-text text-transparent">
-              CASINO
+              BINGO
             </span>
             <span className="text-foreground mx-4">•</span>
             <span className="bg-gradient-gold bg-clip-text text-transparent">
-              BINGO
+              VERSE
             </span>
           </h1>
           <p className="text-xl text-muted-foreground mb-6 max-w-2xl mx-auto">
             Join the ultimate multiplayer Bingo experience with real-time gameplay, 
-            voice callouts, and competitive scoring!
+            voice callouts, and competitive scoring across the universe!
           </p>
           
           {/* Feature Badges */}

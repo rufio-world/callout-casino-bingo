@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { LogIn, UserPlus, ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
-import bingoBackground from '@/assets/bingo-bg.jpg';
+import bingoBackground from '@/assets/bingo-verse-bg.jpg';
 
 const authSchema = z.object({
   email: z.string().trim().email({ message: "Invalid email address" }).max(255, { message: "Email must be less than 255 characters" }),
@@ -195,7 +195,7 @@ const Auth = () => {
           
           <h1 className="text-4xl font-bold mb-4">
             <span className="bg-gradient-casino bg-clip-text text-transparent">
-              CASINO BINGO
+              BINGO VERSE
             </span>
           </h1>
           <p className="text-lg text-muted-foreground">

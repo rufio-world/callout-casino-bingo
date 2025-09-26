@@ -13,7 +13,7 @@ import { AVATAR_OPTIONS, getRandomAvatar } from '@/lib/avatars';
 import { useGameManager } from '@/hooks/useGameManager';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import bingoBackground from '@/assets/bingo-bg.jpg';
+import bingoBackground from '@/assets/bingo-verse-bg.jpg';
 
 const ConfigureGame = () => {
   const navigate = useNavigate();
@@ -92,15 +92,15 @@ const ConfigureGame = () => {
           
           <h1 className="text-4xl font-bold mb-4">
             <span className="bg-gradient-casino bg-clip-text text-transparent">
-              Configure
+              BINGO
             </span>
             <span className="text-foreground mx-4">•</span>
             <span className="bg-gradient-gold bg-clip-text text-transparent">
-              Game
+              VERSE
             </span>
           </h1>
           <p className="text-lg text-muted-foreground">
-            Set up your Bingo room preferences and game settings
+            Set up your Bingo Verse room preferences and game settings
           </p>
         </div>
 
