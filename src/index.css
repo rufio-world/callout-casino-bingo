@@ -2,41 +2,72 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* Bingo Casino Design System - Rich, vibrant gaming aesthetic */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Casino-inspired color palette */
+    --background: 220 15% 8%;
+    --foreground: 45 100% 96%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 220 20% 12%;
+    --card-foreground: 45 100% 96%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 220 20% 12%;
+    --popover-foreground: 45 100% 96%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Rich burgundy primary with gold accents */
+    --primary: 348 83% 47%;
+    --primary-foreground: 45 100% 96%;
+    --primary-glow: 348 83% 65%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Warm gold secondary */
+    --secondary: 45 95% 58%;
+    --secondary-foreground: 220 15% 8%;
+    --secondary-glow: 45 95% 75%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Electric blue accent */
+    --accent: 200 100% 50%;
+    --accent-foreground: 220 15% 8%;
+    --accent-glow: 200 100% 70%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --muted: 220 15% 20%;
+    --muted-foreground: 220 10% 65%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --success: 120 60% 50%;
+    --success-foreground: 210 40% 98%;
+    --success-glow: 120 60% 70%;
 
-    --radius: 0.5rem;
+    --border: 220 15% 25%;
+    --input: 220 15% 18%;
+    --ring: 348 83% 47%;
+
+    --radius: 0.75rem;
+
+    /* Bingo-specific design tokens */
+    --bingo-number: 45 100% 96%;
+    --bingo-marked: 348 83% 47%;
+    --bingo-winner: 45 95% 58%;
+    
+    /* Gradients */
+    --gradient-casino: linear-gradient(135deg, hsl(348 83% 47%) 0%, hsl(348 83% 35%) 100%);
+    --gradient-gold: linear-gradient(135deg, hsl(45 95% 58%) 0%, hsl(45 85% 45%) 100%);
+    --gradient-electric: linear-gradient(135deg, hsl(200 100% 50%) 0%, hsl(220 100% 45%) 100%);
+    --gradient-room: radial-gradient(circle at center, hsl(220 20% 12%) 0%, hsl(220 15% 8%) 100%);
+    
+    /* Shadows and glows */
+    --shadow-casino: 0 10px 30px -5px hsl(348 83% 47% / 0.3);
+    --shadow-gold: 0 10px 30px -5px hsl(45 95% 58% / 0.3);
+    --shadow-electric: 0 10px 30px -5px hsl(200 100% 50% / 0.3);
+    --glow-number: 0 0 20px hsl(45 95% 58% / 0.5);
+    --glow-winner: 0 0 40px hsl(45 95% 58% / 0.8);
+
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
     --sidebar-background: 0 0% 98%;
 
