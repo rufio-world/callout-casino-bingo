@@ -35,50 +35,43 @@ const generateDrawSequence = (): number[] => {
   return numbers;
 };
 
-// Generate bingo cards with proper column structure and better randomness
-const generateBingoCard = (freeCenter: boolean = true, seed?: string): number[] => {
+// Generate bingo cards with proper column structure and cryptographically secure randomness
+const generateBingoCard = (freeCenter: boolean = true, playerIndex: number = 0, cardNumber: number = 1): number[] => {
   const card: number[] = [];
   
-  // Add entropy by using current time and optional seed
-  const entropy = Date.now() + Math.random() * 1000000 + (seed ? seed.split('').reduce((a, b) => a + b.charCodeAt(0), 0) : 0);
-  Math.random = (() => {
-    let x = Math.sin(entropy) * 10000;
-    return () => {
-      x = Math.sin(x) * 10000;
-      return x - Math.floor(x);
-    };
-  })();
+  // Use crypto.getRandomValues for true randomness - no seeding needed
+  const getSecureRandom = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967295;
+  
+  // Add additional entropy based on player and card to ensure uniqueness
+  const entropy = Date.now() + playerIndex * 1000 + cardNumber * 100 + Math.floor(getSecureRandom() * 1000000);
   
   // B column: 1-15 (5 numbers)
-  const bNumbers = generateUniqueNumbers(1, 15, 5);
+  const bNumbers = generateUniqueNumbers(1, 15, 5, entropy + 1);
   card.push(...bNumbers);
   
   // I column: 16-30 (5 numbers)  
-  const iNumbers = generateUniqueNumbers(16, 30, 5);
+  const iNumbers = generateUniqueNumbers(16, 30, 5, entropy + 2);
   card.push(...iNumbers);
   
   // N column: 31-45 (4 or 5 numbers depending on free center)
-  const nNumbers = generateUniqueNumbers(31, 45, freeCenter ? 4 : 5);
+  const nNumbers = generateUniqueNumbers(31, 45, freeCenter ? 4 : 5, entropy + 3);
   if (freeCenter) {
     nNumbers.splice(2, 0, 0); // Insert FREE at position 2
   }
   card.push(...nNumbers);
   
   // G column: 46-60 (5 numbers)
-  const gNumbers = generateUniqueNumbers(46, 60, 5);
+  const gNumbers = generateUniqueNumbers(46, 60, 5, entropy + 4);
   card.push(...gNumbers);
   
   // O column: 61-75 (5 numbers)
-  const oNumbers = generateUniqueNumbers(61, 75, 5);
+  const oNumbers = generateUniqueNumbers(61, 75, 5, entropy + 5);
   card.push(...oNumbers);
-  
-  // Reset Math.random to default
-  Math.random = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967295;
   
   return card;
 };
 
-const generateUniqueNumbers = (min: number, max: number, count: number): number[] => {
+const generateUniqueNumbers = (min: number, max: number, count: number, entropy: number = 0): number[] => {
   const numbers: number[] = [];
   const available: number[] = [];
   
@@ -86,10 +79,11 @@ const generateUniqueNumbers = (min: number, max: number, count: number): number[
     available.push(i);
   }
   
-  // Use crypto-secure randomness for better uniqueness
+  // Use crypto-secure randomness with entropy for better uniqueness
   for (let i = 0; i < count; i++) {
     const randomBytes = crypto.getRandomValues(new Uint32Array(1));
-    const randomIndex = Math.floor((randomBytes[0] / 4294967295) * available.length);
+    // Add entropy to the random calculation to ensure different results per player/card
+    const randomIndex = Math.floor(((randomBytes[0] / 4294967295) + (entropy / 1000000)) % 1 * available.length);
     numbers.push(available[randomIndex]);
     available.splice(randomIndex, 1);
   }
@@ -184,9 +178,8 @@ serve(async (req) => {
           const player = shuffledPlayers[playerIndex];
           
           for (let cardNum = 1; cardNum <= room.cards_per_player; cardNum++) {
-            // Create unique seed for each card to ensure different numbers
-            const uniqueSeed = `${player.id}-${cardNum}-${Date.now()}-${Math.random()}`;
-            const cardNumbers = generateBingoCard(room.free_center, uniqueSeed);
+            // Use player index and card number for unique card generation
+            const cardNumbers = generateBingoCard(room.free_center, playerIndex, cardNum);
             
             // Add small delay to ensure different timestamps
             await new Promise(resolve => setTimeout(resolve, 1));
@@ -281,8 +274,7 @@ serve(async (req) => {
           const player = shuffledPlayers[playerIndex];
           
           for (let cardNum = 1; cardNum <= room.cards_per_player; cardNum++) {
-            const uniqueSeed = `${player.id}-${cardNum}-${Date.now()}-${Math.random()}`;
-            const cardNumbers = generateBingoCard(room.free_center, uniqueSeed);
+            const cardNumbers = generateBingoCard(room.free_center, playerIndex, cardNum);
             
             await new Promise(resolve => setTimeout(resolve, 1));
             
