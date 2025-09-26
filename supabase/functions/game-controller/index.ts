@@ -193,13 +193,15 @@ serve(async (req) => {
           const player = players[playerIndex];
           
           for (let cardNum = 1; cardNum <= room.cards_per_player; cardNum++) {
-            // Use unique player ID hash and timestamp for maximum uniqueness
-            const playerSeed = player.id.split('-').join('').slice(0, 8);
-            const uniqueSeed = parseInt(playerSeed, 16) + playerIndex * 10000 + cardNum * 1000 + Date.now();
-            const cardNumbers = generateBingoCard(room.free_center, uniqueSeed, cardNum);
+            const cardNumbers = await generateBingoCardDeterministic({
+              roomId: room.id,
+              roundId: round.id,
+              playerId: player.id,
+              cardNumber: cardNum,
+              freeCenter: room.free_center,
+            });
             
-            // Add small delay to ensure different timestamps
-            await new Promise(resolve => setTimeout(resolve, 2));
+            const cardHash = await sha256Hex(cardNumbers.join(','));
             
             await supabaseClient
               .from('bingo_cards')
@@ -210,7 +212,8 @@ serve(async (req) => {
                 numbers: cardNumbers,
                 marked_positions: Array(25).fill(false),
                 is_winner: false,
-                points_earned: 0
+                points_earned: 0,
+                card_hash: cardHash
               });
           }
         }
@@ -289,12 +292,15 @@ serve(async (req) => {
           const player = players[playerIndex];
           
           for (let cardNum = 1; cardNum <= room.cards_per_player; cardNum++) {
-            // Use unique player ID hash and timestamp for maximum uniqueness
-            const playerSeed = player.id.split('-').join('').slice(0, 8);
-            const uniqueSeed = parseInt(playerSeed, 16) + playerIndex * 10000 + cardNum * 1000 + Date.now();
-            const cardNumbers = generateBingoCard(room.free_center, uniqueSeed, cardNum);
+            const cardNumbers = await generateBingoCardDeterministic({
+              roomId: room.id,
+              roundId: newRound.id,
+              playerId: player.id,
+              cardNumber: cardNum,
+              freeCenter: room.free_center,
+            });
             
-            await new Promise(resolve => setTimeout(resolve, 2));
+            const cardHash = await sha256Hex(cardNumbers.join(','));
             
             await supabaseClient
               .from('bingo_cards')
@@ -305,7 +311,8 @@ serve(async (req) => {
                 numbers: cardNumbers,
                 marked_positions: Array(25).fill(false),
                 is_winner: false,
-                points_earned: 0
+                points_earned: 0,
+                card_hash: cardHash
               });
           }
         }
