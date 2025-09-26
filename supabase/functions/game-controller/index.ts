@@ -37,36 +37,54 @@ const generateDrawSequence = (): number[] => {
 
 // Generate bingo cards with proper column structure and cryptographically secure randomness
 const generateBingoCard = (freeCenter: boolean = true, playerIndex: number = 0, cardNumber: number = 1): number[] => {
-  const card: number[] = [];
+  // Initialize 5x5 grid (25 positions)
+  const card: number[] = new Array(25);
   
-  // Use crypto.getRandomValues for true randomness - no seeding needed
+  // Use crypto.getRandomValues for true randomness
   const getSecureRandom = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967295;
   
   // Add additional entropy based on player and card to ensure uniqueness
   const entropy = Date.now() + playerIndex * 1000 + cardNumber * 100 + Math.floor(getSecureRandom() * 1000000);
   
-  // B column: 1-15 (5 numbers)
+  // B column: 1-15 (positions 0, 5, 10, 15, 20)
   const bNumbers = generateUniqueNumbers(1, 15, 5, entropy + 1);
-  card.push(...bNumbers);
+  card[0] = bNumbers[0];
+  card[5] = bNumbers[1];
+  card[10] = bNumbers[2];
+  card[15] = bNumbers[3];
+  card[20] = bNumbers[4];
   
-  // I column: 16-30 (5 numbers)  
+  // I column: 16-30 (positions 1, 6, 11, 16, 21)
   const iNumbers = generateUniqueNumbers(16, 30, 5, entropy + 2);
-  card.push(...iNumbers);
+  card[1] = iNumbers[0];
+  card[6] = iNumbers[1];
+  card[11] = iNumbers[2];
+  card[16] = iNumbers[3];
+  card[21] = iNumbers[4];
   
-  // N column: 31-45 (4 or 5 numbers depending on free center)
+  // N column: 31-45 (positions 2, 7, 12, 17, 22) - position 12 is center
   const nNumbers = generateUniqueNumbers(31, 45, freeCenter ? 4 : 5, entropy + 3);
-  if (freeCenter) {
-    nNumbers.splice(2, 0, 0); // Insert FREE at position 2
-  }
-  card.push(...nNumbers);
+  card[2] = nNumbers[0];
+  card[7] = nNumbers[1];
+  card[12] = freeCenter ? 0 : nNumbers[2]; // FREE space or regular number
+  card[17] = freeCenter ? nNumbers[2] : nNumbers[3];
+  card[22] = freeCenter ? nNumbers[3] : nNumbers[4];
   
-  // G column: 46-60 (5 numbers)
+  // G column: 46-60 (positions 3, 8, 13, 18, 23)
   const gNumbers = generateUniqueNumbers(46, 60, 5, entropy + 4);
-  card.push(...gNumbers);
+  card[3] = gNumbers[0];
+  card[8] = gNumbers[1];
+  card[13] = gNumbers[2];
+  card[18] = gNumbers[3];
+  card[23] = gNumbers[4];
   
-  // O column: 61-75 (5 numbers)
+  // O column: 61-75 (positions 4, 9, 14, 19, 24)
   const oNumbers = generateUniqueNumbers(61, 75, 5, entropy + 5);
-  card.push(...oNumbers);
+  card[4] = oNumbers[0];
+  card[9] = oNumbers[1];
+  card[14] = oNumbers[2];
+  card[19] = oNumbers[3];
+  card[24] = oNumbers[4];
   
   return card;
 };
