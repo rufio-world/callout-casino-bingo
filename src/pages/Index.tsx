@@ -278,7 +278,7 @@ const Index = () => {
         {/* Footer */}
         <div className="text-center mt-16 text-muted-foreground">
           <p className="text-sm">
-            Secure • Real-time • Fair Play • Up to 10 players per room
+            No money involved • Secure • Real-time • Fair Play • Up to 10 players per room
           </p>
         </div>
       </div>
