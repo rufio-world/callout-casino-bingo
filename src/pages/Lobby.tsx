@@ -5,11 +5,13 @@ import GameLobby from '@/components/game/GameLobby';
 import { GameRoom, RoomPlayer } from '@/types/game';
 import { useToast } from '@/hooks/use-toast';
 import { generateBingoCard } from '@/lib/bingo';
+import { useAuth } from '@/hooks/useAuth';
 
 const Lobby = () => {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   
   const [room, setRoom] = useState<GameRoom | null>(null);
   const [players, setPlayers] = useState<RoomPlayer[]>([]);
@@ -23,7 +25,7 @@ const Lobby = () => {
     }
 
     loadRoomData();
-  }, [roomCode, navigate]);
+  }, [roomCode, navigate, user]);
 
   useEffect(() => {
     if (!room) return;
@@ -94,10 +96,13 @@ const Lobby = () => {
 
       setRoom(roomData);
 
-      // Load players
+      // Load players with profile information to match with authenticated user
       const { data: playersData, error: playersError } = await supabase
         .from('room_players')
-        .select('*')
+        .select(`
+          *,
+          profiles!inner(user_id)
+        `)
         .eq('room_id', roomData.id);
 
       if (playersError) {
@@ -107,9 +112,14 @@ const Lobby = () => {
 
       setPlayers(playersData || []);
       
-      // For demo purposes, set the first player as current player
-      // In a real app, this would be based on authentication
-      if (playersData && playersData.length > 0) {
+      // Find the current player based on authenticated user
+      if (playersData && user) {
+        const currentUserPlayer = playersData.find(player => 
+          player.profiles?.user_id === user.id
+        );
+        setCurrentPlayer(currentUserPlayer || null);
+      } else if (playersData && playersData.length > 0) {
+        // Fallback for demo purposes when no user is authenticated
         setCurrentPlayer(playersData[0]);
       }
 
