@@ -23,7 +23,50 @@ const Lobby = () => {
     }
 
     loadRoomData();
-  }, [roomCode]);
+    
+    // Set up real-time subscriptions for players and room updates
+    const playersChannel = supabase
+      .channel('room-players-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'room_players'
+        },
+        () => {
+          // Reload room data when players change
+          loadRoomData();
+        }
+      )
+      .subscribe();
+
+    const roomChannel = supabase
+      .channel('game-room-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'game_rooms'
+        },
+        (payload) => {
+          // Check if this room's status changed to in_progress
+          if (payload.new.room_code === roomCode && payload.new.status === 'in_progress') {
+            navigate(`/game/${roomCode}`);
+          } else if (payload.new.room_code === roomCode) {
+            // Update room data for other changes
+            setRoom(payload.new as GameRoom);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(playersChannel);
+      supabase.removeChannel(roomChannel);
+    };
+  }, [roomCode, navigate]);
 
   const loadRoomData = async () => {
     try {

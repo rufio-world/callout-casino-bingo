@@ -4,47 +4,70 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import BingoCard from '@/components/game/BingoCard';
 import NumberDrawDisplay from '@/components/game/NumberDrawDisplay';
-import { DrawnNumber } from '@/types/game';
-import { generateBingoCard, generateDrawSequence } from '@/lib/bingo';
+import { DrawnNumber, GameRoom, RoomPlayer, GameRound, BingoCard as BingoCardType } from '@/types/game';
+import { generateBingoCard, getBingoLetter, announceNumber } from '@/lib/bingo';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import { Users, Trophy, Clock, Home } from 'lucide-react';
 
 const Game = () => {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
   
-  // Demo game state - in a real app this would come from Supabase
+  // Game state from Supabase
+  const [room, setRoom] = useState<GameRoom | null>(null);
+  const [players, setPlayers] = useState<RoomPlayer[]>([]);
+  const [currentPlayer, setCurrentPlayer] = useState<RoomPlayer | null>(null);
+  const [currentRound, setCurrentRound] = useState<GameRound | null>(null);
+  const [cards, setCards] = useState<BingoCardType[]>([]);
   const [currentNumber, setCurrentNumber] = useState<number | null>(null);
   const [drawnNumbers, setDrawnNumbers] = useState<DrawnNumber[]>([]);
-  const [timeRemaining, setTimeRemaining] = useState(240); // 4 minutes
-  const [roundNumber, setRoundNumber] = useState(1);
+  const [timeRemaining, setTimeRemaining] = useState(240);
   const [audioEnabled, setAudioEnabled] = useState(true);
-  const [gameActive, setGameActive] = useState(false);
-  
-  // Demo bingo cards
-  const [cards, setCards] = useState(() => [
-    {
-      id: '1',
-      numbers: generateBingoCard(true),
-      markedPositions: Array(25).fill(false),
-      isWinner: false
-    }
-  ]);
+  const [loading, setLoading] = useState(true);
 
-  // Demo players
-  const players = [
-    { name: 'You', score: 0, avatar: '🐻' },
-    { name: 'Player 2', score: 0, avatar: '🦊' },
-    { name: 'Player 3', score: 0, avatar: '🐼' },
-  ];
-
-  // Start demo game
+  // Load game data and set up real-time subscriptions
   useEffect(() => {
-    if (!gameActive) return;
+    if (!roomCode) {
+      navigate('/');
+      return;
+    }
+
+    loadGameData();
+    
+    // Set up real-time subscription for round updates
+    const roundChannel = supabase
+      .channel('game-round-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'game_rounds'
+        },
+        (payload) => {
+          if (payload.new) {
+            setCurrentRound(payload.new as GameRound);
+            updateDrawnNumbers(payload.new as GameRound);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(roundChannel);
+    };
+  }, [roomCode, navigate]);
+
+  // Timer countdown
+  useEffect(() => {
+    if (!currentRound || currentRound.status !== 'active') return;
 
     const interval = setInterval(() => {
       setTimeRemaining(prev => {
-        if (prev <= 0) {
-          setGameActive(false);
+        if (prev <= 1) {
+          // Round should be ending
           return 0;
         }
         return prev - 1;
@@ -52,83 +75,162 @@ const Game = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [gameActive]);
+  }, [currentRound]);
 
-  // Draw numbers every 4 seconds during active game
-  useEffect(() => {
-    if (!gameActive) return;
+  const loadGameData = async () => {
+    try {
+      // Load room data
+      const { data: roomData, error: roomError } = await supabase
+        .from('game_rooms')
+        .select('*')
+        .eq('room_code', roomCode)
+        .single();
 
-    const drawSequence = generateDrawSequence();
-    let drawIndex = 0;
-
-    const drawInterval = setInterval(() => {
-      setTimeRemaining(current => {
-        if (current <= 0) {
-          setGameActive(false);
-          return 0;
-        }
-        return current;
-      });
-
-      if (drawIndex >= drawSequence.length) {
-        setGameActive(false);
-        clearInterval(drawInterval);
+      if (roomError) {
+        console.error('Room error:', roomError);
+        navigate('/');
         return;
       }
 
-      const newNumber = drawSequence[drawIndex];
-      setCurrentNumber(newNumber);
+      setRoom(roomData);
+
+      // Load players
+      const { data: playersData, error: playersError } = await supabase
+        .from('room_players')
+        .select('*')
+        .eq('room_id', roomData.id);
+
+      if (playersError) {
+        console.error('Players error:', playersError);
+        return;
+      }
+
+      setPlayers(playersData || []);
       
-      setDrawnNumbers(prev => [...prev, {
-        number: newNumber,
-        timestamp: Date.now(),
-        announced: true
-      }]);
+      // Set current player (first player for demo)
+      if (playersData && playersData.length > 0) {
+        setCurrentPlayer(playersData[0]);
+      }
 
-      drawIndex++;
-    }, 4000);
+      // Load current round
+      const { data: roundData, error: roundError } = await supabase
+        .from('game_rounds')
+        .select('*')
+        .eq('room_id', roomData.id)
+        .eq('round_number', roomData.current_round_number)
+        .single();
 
-    return () => clearInterval(drawInterval);
-  }, [gameActive]);
+      if (!roundError && roundData) {
+        setCurrentRound(roundData);
+        updateDrawnNumbers(roundData);
+        
+        // Calculate time remaining
+        const startTime = new Date(roundData.start_time).getTime();
+        const now = Date.now();
+        const elapsed = Math.floor((now - startTime) / 1000);
+        const remaining = Math.max(0, 240 - elapsed);
+        setTimeRemaining(remaining);
+      }
 
-  const handleStartGame = () => {
-    setGameActive(true);
-    setTimeRemaining(240);
-    setDrawnNumbers([]);
-    setCurrentNumber(null);
+      // Load bingo cards
+      if (playersData && playersData.length > 0) {
+        const { data: cardsData, error: cardsError } = await supabase
+          .from('bingo_cards')
+          .select('*')
+          .eq('room_player_id', playersData[0].id);
+
+        if (!cardsError && cardsData) {
+          setCards(cardsData);
+        }
+      }
+
+    } catch (error) {
+      console.error('Error loading game:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleNumberClick = (cardIndex: number, numberIndex: number) => {
+  const updateDrawnNumbers = (round: GameRound) => {
+    const drawnCount = round.current_draw_index;
+    const numbers: DrawnNumber[] = [];
+    
+    for (let i = 0; i < drawnCount; i++) {
+      if (round.draw_sequence[i]) {
+        numbers.push({
+          number: round.draw_sequence[i],
+          timestamp: Date.now() - (drawnCount - i) * 4000,
+          announced: true
+        });
+      }
+    }
+    
+    setDrawnNumbers(numbers);
+    setCurrentNumber(numbers.length > 0 ? numbers[numbers.length - 1].number : null);
+  };
+
+  // This function is now not needed as game is controlled by host
+
+  const handleNumberClick = async (cardIndex: number, numberIndex: number) => {
     const card = cards[cardIndex];
     const number = card.numbers[numberIndex];
     
-    // Check if number has been drawn
-    const numberDrawn = drawnNumbers.some(d => d.number === number) || number === 0; // 0 is FREE
+    // Check if number has been drawn or is FREE space
+    const numberDrawn = drawnNumbers.some(d => d.number === number) || number === 0;
     
     if (!numberDrawn) return;
 
-    setCards(prev => prev.map((c, i) => 
-      i === cardIndex 
-        ? {
-            ...c,
-            markedPositions: c.markedPositions.map((marked, idx) => 
-              idx === numberIndex ? !marked : marked
-            )
-          }
-        : c
-    ));
+    const newMarkedPositions = [...card.marked_positions];
+    newMarkedPositions[numberIndex] = !newMarkedPositions[numberIndex];
+
+    try {
+      // Update card in database
+      const { error } = await supabase
+        .from('bingo_cards')
+        .update({ marked_positions: newMarkedPositions })
+        .eq('id', card.id);
+
+      if (error) {
+        console.error('Error updating card:', error);
+        return;
+      }
+
+      // Update local state
+      setCards(prev => prev.map((c, i) => 
+        i === cardIndex 
+          ? { ...c, marked_positions: newMarkedPositions }
+          : c
+      ));
+
+    } catch (error) {
+      console.error('Error updating card:', error);
+    }
   };
 
   const handleLeaveGame = () => {
     navigate('/');
   };
 
-  if (!roomCode) {
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-room flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-secondary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading game...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!roomCode || !room || !currentPlayer) {
     navigate('/');
     return null;
   }
 
   const allDrawnNumbers = drawnNumbers.map(d => d.number);
+  const isGameActive = currentRound?.status === 'active';
+  const roundNumber = room.current_round_number;
+  const totalRounds = room.rounds_total;
 
   return (
     <div className="min-h-screen bg-gradient-room p-4">
@@ -150,11 +252,16 @@ const Game = () => {
             </div>
           </div>
           
-          {!gameActive && timeRemaining === 240 && (
-            <Button onClick={handleStartGame} variant="casino" size="lg">
-              Start Demo Game
-            </Button>
-          )}
+          <div className="text-center">
+            <div className="text-lg font-semibold mb-2">
+              Round {roundNumber} of {totalRounds}
+            </div>
+            {currentNumber && (
+              <div className="text-3xl font-bold text-secondary">
+                {announceNumber(currentNumber)}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -165,8 +272,8 @@ const Game = () => {
               drawnNumbers={drawnNumbers}
               timeRemaining={timeRemaining}
               roundNumber={roundNumber}
-              totalRounds={5}
-              isGameActive={gameActive}
+              totalRounds={totalRounds}
+              isGameActive={isGameActive}
               audioEnabled={audioEnabled}
               onAudioToggle={() => setAudioEnabled(!audioEnabled)}
             />
@@ -184,14 +291,16 @@ const Game = () => {
               <CardContent>
                 <div className="space-y-3">
                   {players.map((player, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 rounded bg-card/30">
+                    <div key={player.id} className="flex items-center justify-between p-2 rounded bg-card/30">
                       <div className="flex items-center gap-2">
-                        <span className="text-xl">{player.avatar}</span>
-                        <span className="font-semibold">{player.name}</span>
+                        <span className="text-xl">
+                          {player.avatar_name === 'default-avatar' ? '👤' : '🐻'}
+                        </span>
+                        <span className="font-semibold">{player.player_name}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <Trophy className="h-4 w-4 text-secondary" />
-                        <span className="font-bold">{player.score}</span>
+                        <span className="font-bold">{player.total_score}</span>
                       </div>
                     </div>
                   ))}
@@ -209,20 +318,20 @@ const Game = () => {
               <BingoCard
                 key={card.id}
                 numbers={card.numbers}
-                markedPositions={card.markedPositions}
+                markedPositions={card.marked_positions}
                 onNumberClick={(numberIndex) => handleNumberClick(index, numberIndex)}
                 drawnNumbers={allDrawnNumbers}
-                isWinner={card.isWinner}
+                isWinner={card.is_winner}
                 playerName="Your Card"
-                cardNumber={index + 1}
-                disabled={!gameActive}
+                cardNumber={card.card_number}
+                disabled={!isGameActive}
               />
             ))}
           </div>
         </div>
 
         {/* Game Status */}
-        {!gameActive && drawnNumbers.length > 0 && (
+        {!isGameActive && drawnNumbers.length > 0 && (
           <div className="text-center mt-8">
             <Card className="bg-card/50 border-primary/20 max-w-md mx-auto">
               <CardContent className="pt-6">
@@ -230,9 +339,9 @@ const Game = () => {
                 <p className="text-muted-foreground mb-4">
                   Numbers drawn: {drawnNumbers.length}
                 </p>
-                <Button onClick={handleStartGame} variant="casino">
-                  Start Next Round
-                </Button>
+                <p className="text-muted-foreground">
+                  Waiting for next round to start...
+                </p>
               </CardContent>
             </Card>
           </div>
