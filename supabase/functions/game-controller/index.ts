@@ -35,9 +35,19 @@ const generateDrawSequence = (): number[] => {
   return numbers;
 };
 
-// Generate bingo cards with proper column structure
-const generateBingoCard = (freeCenter: boolean = true): number[] => {
+// Generate bingo cards with proper column structure and better randomness
+const generateBingoCard = (freeCenter: boolean = true, seed?: string): number[] => {
   const card: number[] = [];
+  
+  // Add entropy by using current time and optional seed
+  const entropy = Date.now() + Math.random() * 1000000 + (seed ? seed.split('').reduce((a, b) => a + b.charCodeAt(0), 0) : 0);
+  Math.random = (() => {
+    let x = Math.sin(entropy) * 10000;
+    return () => {
+      x = Math.sin(x) * 10000;
+      return x - Math.floor(x);
+    };
+  })();
   
   // B column: 1-15 (5 numbers)
   const bNumbers = generateUniqueNumbers(1, 15, 5);
@@ -62,6 +72,9 @@ const generateBingoCard = (freeCenter: boolean = true): number[] => {
   const oNumbers = generateUniqueNumbers(61, 75, 5);
   card.push(...oNumbers);
   
+  // Reset Math.random to default
+  Math.random = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967295;
+  
   return card;
 };
 
@@ -73,8 +86,10 @@ const generateUniqueNumbers = (min: number, max: number, count: number): number[
     available.push(i);
   }
   
+  // Use crypto-secure randomness for better uniqueness
   for (let i = 0; i < count; i++) {
-    const randomIndex = Math.floor(Math.random() * available.length);
+    const randomBytes = crypto.getRandomValues(new Uint32Array(1));
+    const randomIndex = Math.floor((randomBytes[0] / 4294967295) * available.length);
     numbers.push(available[randomIndex]);
     available.splice(randomIndex, 1);
   }
@@ -155,16 +170,26 @@ serve(async (req) => {
         throw new Error(`Failed to create round: ${roundError.message}`);
       }
 
-      // Create bingo cards for all players
+      // Create bingo cards for all players with unique seeds
       const { data: players } = await supabaseClient
         .from('room_players')
         .select('*')
         .eq('room_id', room.id);
 
       if (players) {
-        for (const player of players) {
+        // Shuffle players to ensure card generation order doesn't affect uniqueness
+        const shuffledPlayers = [...players].sort(() => Math.random() - 0.5);
+        
+        for (let playerIndex = 0; playerIndex < shuffledPlayers.length; playerIndex++) {
+          const player = shuffledPlayers[playerIndex];
+          
           for (let cardNum = 1; cardNum <= room.cards_per_player; cardNum++) {
-            const cardNumbers = generateBingoCard(room.free_center);
+            // Create unique seed for each card to ensure different numbers
+            const uniqueSeed = `${player.id}-${cardNum}-${Date.now()}-${Math.random()}`;
+            const cardNumbers = generateBingoCard(room.free_center, uniqueSeed);
+            
+            // Add small delay to ensure different timestamps
+            await new Promise(resolve => setTimeout(resolve, 1));
             
             await supabaseClient
               .from('bingo_cards')
