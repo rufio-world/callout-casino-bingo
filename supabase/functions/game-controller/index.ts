@@ -342,12 +342,12 @@ async function drawNumber(supabaseClient: any, roundId: string) {
     const startTime = new Date(round.start_time).getTime();
     const now = Date.now();
     const elapsed = (now - startTime) / 1000;
-    const maxNumbers = Math.floor(240 / 4); // 60 numbers max in 4 minutes
+    const maxNumbers = 60; // Exactly 60 numbers in 4 minutes (240 seconds / 4 seconds per number)
     
     console.log(`Round timing - elapsed: ${elapsed}s, numbers drawn: ${round.current_draw_index}/${maxNumbers}, max time: 240s`);
     
-    // End round if we've reached time limit OR drawn maximum numbers
-    if (elapsed >= 240 || round.current_draw_index >= maxNumbers) {
+    // End round if we've reached the time limit
+    if (elapsed >= 240) {
       await supabaseClient
         .from('game_rounds')
         .update({ 
@@ -356,57 +356,25 @@ async function drawNumber(supabaseClient: any, roundId: string) {
         })
         .eq('id', roundId);
       
-      console.log(`Round completed - Time: ${elapsed}s, Numbers: ${round.current_draw_index}`);
+      console.log(`Round completed - Time limit reached: ${elapsed}s, Numbers drawn: ${round.current_draw_index}`);
       return;
     }
 
-    // Ensure we don't exceed our draw sequence length
-    if (round.current_draw_index >= round.draw_sequence.length) {
-      console.log('All numbers drawn from sequence');
+    // Draw next number if we haven't reached the maximum and have numbers left in sequence
+    if (round.current_draw_index < maxNumbers && round.current_draw_index < round.draw_sequence.length) {
+      const nextIndex = round.current_draw_index;
+      const drawnNumber = round.draw_sequence[nextIndex];
+      
       await supabaseClient
         .from('game_rounds')
-        .update({ 
-          status: 'completed',
-          end_time: new Date().toISOString()
-        })
+        .update({ current_draw_index: nextIndex + 1 })
         .eq('id', roundId);
-      return;
+
+      console.log(`Drew number ${nextIndex + 1}/${maxNumbers}: ${drawnNumber} at ${elapsed.toFixed(1)}s`);
     }
 
-    // Draw next number
-    const nextIndex = round.current_draw_index;
-    const drawnNumber = round.draw_sequence[nextIndex];
-    
-    await supabaseClient
-      .from('game_rounds')
-      .update({ current_draw_index: nextIndex + 1 })
-      .eq('id', roundId);
-
-    console.log(`Drew number ${nextIndex + 1}/${maxNumbers}: ${drawnNumber} at ${elapsed.toFixed(1)}s`);
-
-    // Schedule next number draw in 4 seconds, but check if we have time left
-    const timeForNextDraw = elapsed + 4;
-    if (timeForNextDraw < 240 && nextIndex + 1 < maxNumbers) {
-      setTimeout(() => drawNumber(supabaseClient, roundId), 4000);
-    } else {
-      // This will be the last number or we're near the end
-      const remainingTime = Math.max(0, 240 - elapsed);
-      setTimeout(async () => {
-        // Final check and end round
-        try {
-          await supabaseClient
-            .from('game_rounds')
-            .update({ 
-              status: 'completed',
-              end_time: new Date().toISOString()
-            })
-            .eq('id', roundId);
-          console.log('Round completed - time limit reached');
-        } catch (error) {
-          console.error('Error completing round:', error);
-        }
-      }, Math.max(0, remainingTime * 1000)); // Wait until exactly 4 minutes
-    }
+    // Schedule next draw in exactly 4 seconds
+    setTimeout(() => drawNumber(supabaseClient, roundId), 4000);
 
   } catch (error) {
     console.error('Error drawing number:', error);
