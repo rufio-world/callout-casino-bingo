@@ -9,6 +9,7 @@ import { generateBingoCard, getBingoLetter, announceNumber } from '@/lib/bingo';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Users, Trophy, Clock, Home } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const Game = () => {
   const { roomCode } = useParams<{ roomCode: string }>();
@@ -25,6 +26,7 @@ const Game = () => {
   const [drawnNumbers, setDrawnNumbers] = useState<DrawnNumber[]>([]);
   const [timeRemaining, setTimeRemaining] = useState(240);
   const [audioEnabled, setAudioEnabled] = useState(true);
+  const [roundPoints, setRoundPoints] = useState(0);
   const [loading, setLoading] = useState(true);
 
   // Load game data and set up real-time subscriptions
@@ -167,6 +169,21 @@ const Game = () => {
     }
   }, [currentPlayer, currentRound]);
 
+  // Calculate round points when cards change
+  useEffect(() => {
+    if (cards.length > 0) {
+      calculateRoundPoints();
+    }
+  }, [cards]);
+
+  const calculateRoundPoints = () => {
+    let totalPoints = 0;
+    cards.forEach(card => {
+      totalPoints += card.points_earned || 0;
+    });
+    setRoundPoints(totalPoints);
+  };
+
   const loadPlayerCards = async () => {
     if (!currentPlayer || !currentRound) return;
     
@@ -272,7 +289,7 @@ const Game = () => {
   return (
     <div className="min-h-screen bg-gradient-room p-4">
       <div className="container mx-auto max-w-7xl">
-        {/* Header */}
+        {/* Header with Player Round Points */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <Button 
@@ -289,21 +306,29 @@ const Game = () => {
             </div>
           </div>
           
+          {/* Current Player Round Points */}
           <div className="text-center">
-            <div className="text-lg font-semibold mb-2">
+            <div className="bg-card/50 border border-primary/20 rounded-lg px-4 py-2 mb-2">
+              <div className="text-sm text-muted-foreground">Round Points</div>
+              <div className="text-2xl font-bold text-secondary">{roundPoints}</div>
+            </div>
+            <div className="text-lg font-semibold">
               Round {roundNumber} of {totalRounds}
             </div>
             {currentNumber && (
-              <div className="text-3xl font-bold text-secondary">
+              <div className="text-3xl font-bold text-secondary mt-2">
                 {announceNumber(currentNumber)}
               </div>
             )}
           </div>
+          
+          <div className="w-24"></div> {/* Spacer for balance */}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Number Display */}
-          <div className="lg:col-span-2">
+        {/* Main Game Area */}
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+          {/* Number Display - Takes up 3 columns on xl screens */}
+          <div className="xl:col-span-3">
             <NumberDrawDisplay
               currentNumber={currentNumber}
               drawnNumbers={drawnNumbers}
@@ -316,41 +341,34 @@ const Game = () => {
             />
           </div>
 
-          {/* Players & Scores */}
-          <div>
-            <Card className="bg-card/50 border-primary/20 mb-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Users className="h-5 w-5" />
-                  Players
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {players.map((player, index) => (
-                    <div key={player.id} className="flex items-center justify-between p-2 rounded bg-card/30">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl">
-                          {player.avatar_name === 'default-avatar' ? '👤' : '🐻'}
-                        </span>
-                        <span className="font-semibold">{player.player_name}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Trophy className="h-4 w-4 text-secondary" />
-                        <span className="font-bold">{player.total_score}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+          {/* Game Status - Only show when game is not active */}
+          <div className="xl:col-span-1">
+            {!isGameActive && drawnNumbers.length > 0 && (
+              <Card className="bg-card/50 border-primary/20">
+                <CardContent className="pt-6 text-center">
+                  <h3 className="text-xl font-bold mb-2">Round Complete!</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Numbers drawn: {drawnNumbers.length}
+                  </p>
+                  <p className="text-muted-foreground">
+                    Waiting for next round...
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
 
-        {/* Bingo Cards */}
+        {/* Bingo Cards - Always visible and properly spaced */}
         <div className="mt-8">
           <h2 className="text-2xl font-bold mb-4 text-center">Your Bingo Cards</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 max-w-6xl mx-auto">
+          <div className={cn(
+            "grid gap-4 max-w-full mx-auto",
+            cards.length === 1 && "grid-cols-1 max-w-md",
+            cards.length === 2 && "grid-cols-1 md:grid-cols-2 max-w-4xl",
+            cards.length === 3 && "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 max-w-6xl",
+            cards.length === 4 && "grid-cols-1 md:grid-cols-2 xl:grid-cols-4 max-w-7xl"
+          )}>
             {cards.map((card, index) => (
               <BingoCard
                 key={card.id}
@@ -367,23 +385,6 @@ const Game = () => {
             ))}
           </div>
         </div>
-
-        {/* Game Status */}
-        {!isGameActive && drawnNumbers.length > 0 && (
-          <div className="text-center mt-8">
-            <Card className="bg-card/50 border-primary/20 max-w-md mx-auto">
-              <CardContent className="pt-6">
-                <h3 className="text-xl font-bold mb-2">Round Complete!</h3>
-                <p className="text-muted-foreground mb-4">
-                  Numbers drawn: {drawnNumbers.length}
-                </p>
-                <p className="text-muted-foreground">
-                  Waiting for next round to start...
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
       </div>
     </div>
   );
