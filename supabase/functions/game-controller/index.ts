@@ -17,80 +17,87 @@ interface GameRound {
   status: string;
 }
 
-// --- Deterministic seed helpers --------------------------------------------
-async function sha256Hex(input: string): Promise<string> {
-  const enc = new TextEncoder();
-  const digest = await crypto.subtle.digest("SHA-256", enc.encode(input));
-  const bytes = new Uint8Array(digest);
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
-function mulberry32(seed: number) {
-  return function () {
-    let t = seed += 0x6D2B79F5;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+// --- Deterministic seed helpers (synchronous) --------------------------------------------
+// Deterministic PRNG: xmur3 + sfc32
+function xmur3(str: string) {
+  let h = 1779033703 ^ str.length;
+  for (let i = 0; i < str.length; i++) {
+    h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  return function() {
+    h = Math.imul(h ^ (h >>> 16), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return (h ^= h >>> 16) >>> 0;
   };
 }
 
-function seedFromHex(hex: string): number {
-  return parseInt(hex.slice(0, 8), 16) >>> 0;
+function sfc32(a: number, b: number, c: number, d: number) {
+  return function() {
+    a >>>= 0; b >>>= 0; c >>>= 0; d >>>= 0;
+    let t = (a + b) | 0;
+    a = b ^ (b >>> 9);
+    b = (c + (c << 3)) | 0;
+    c = (c << 21) | (c >>> 11);
+    c = (c + t) | 0;
+    d = (d + 1) | 0;
+    t = (t + d) | 0;
+    c = (c + t) | 0;
+    return (t >>> 0) / 4294967296;
+  };
 }
 
-function shuffle<T>(arr: T[], rnd: () => number): T[] {
+function rngFromString(seedStr: string) {
+  const seed = xmur3(seedStr);
+  return sfc32(seed(), seed(), seed(), seed());
+}
+
+function shuffleInPlace<T>(arr: T[], rnd: () => number) {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(rnd() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
-  return arr;
 }
 
-function sampleColumn(min: number, max: number, k: number, rnd: () => number): number[] {
+function sampleSorted(min: number, max: number, k: number, rnd: () => number): number[] {
   const pool: number[] = [];
   for (let n = min; n <= max; n++) pool.push(n);
-  shuffle(pool, rnd);
+  shuffleInPlace(pool, rnd);
   return pool.slice(0, k).sort((a, b) => a - b);
 }
 
-// --- Deterministic 5x5 bingo card (US 75-ball) ------------------------------
-async function generateBingoCardDeterministic({
-  roomId,
-  roundId,
-  playerId,
-  cardNumber,
-  freeCenter = true,
-}: {
+// --- Deterministic 5x5 bingo card (US 75-ball) - SYNCHRONOUS ------------------------------
+function generateBingoCardSync(params: {
   roomId: string;
   roundId: string;
   playerId: string;
   cardNumber: number;
   freeCenter?: boolean;
-}): Promise<number[]> {
-  const seedString = `${roomId}:${roundId}:${playerId}:card${cardNumber}:free${freeCenter ? 1 : 0}`;
-  const hex = await sha256Hex(seedString);
-  const rnd = mulberry32(seedFromHex(hex));
+}): number[] {
+  const { roomId, roundId, playerId, cardNumber, freeCenter = true } = params;
+  const seedStr = `${roomId}|${roundId}|${playerId}|${cardNumber}|free:${freeCenter ? 1 : 0}`;
+  const rnd = rngFromString(seedStr);
 
   const c = new Array<number>(25);
 
-  const b = sampleColumn(1, 15, 5, rnd);
+  const b = sampleSorted(1, 15, 5, rnd);
   c[0] = b[0]; c[5] = b[1]; c[10] = b[2]; c[15] = b[3]; c[20] = b[4];
 
-  const i = sampleColumn(16, 30, 5, rnd);
+  const i = sampleSorted(16, 30, 5, rnd);
   c[1] = i[0]; c[6] = i[1]; c[11] = i[2]; c[16] = i[3]; c[21] = i[4];
 
   const nCount = freeCenter ? 4 : 5;
-  const n = sampleColumn(31, 45, nCount, rnd);
+  const n = sampleSorted(31, 45, nCount, rnd);
   c[2] = n[0];
   c[7] = n[1];
   c[12] = freeCenter ? 0 : n[2];
   c[17] = freeCenter ? n[2] : n[3];
   c[22] = freeCenter ? n[3] : n[4];
 
-  const g = sampleColumn(46, 60, 5, rnd);
+  const g = sampleSorted(46, 60, 5, rnd);
   c[3] = g[0]; c[8] = g[1]; c[13] = g[2]; c[18] = g[3]; c[23] = g[4];
 
-  const o = sampleColumn(61, 75, 5, rnd);
+  const o = sampleSorted(61, 75, 5, rnd);
   c[4] = o[0]; c[9] = o[1]; c[14] = o[2]; c[19] = o[3]; c[24] = o[4];
 
   return c;
@@ -194,11 +201,13 @@ serve(async (req) => {
         .eq('room_id', room.id);
 
       if (players) {
+        console.log(`CARD_GEN: Creating cards for ${players.length} players, ${room.cards_per_player} cards each`);
+        
         for (let playerIndex = 0; playerIndex < players.length; playerIndex++) {
           const player = players[playerIndex];
           
           for (let cardNum = 1; cardNum <= room.cards_per_player; cardNum++) {
-            const cardNumbers = await generateBingoCardDeterministic({
+            const cardNumbers = generateBingoCardSync({
               roomId: room.id,
               roundId: round.id,
               playerId: player.id,
@@ -206,7 +215,16 @@ serve(async (req) => {
               freeCenter: room.free_center,
             });
             
-            const cardHash = await sha256Hex(cardNumbers.join(','));
+            const cardHash = cardNumbers.join(',');
+            
+            console.log('CARD_GEN', {
+              roomId: room.id,
+              roundId: round.id,
+              playerId: player.id,
+              playerName: player.player_name,
+              cardNum,
+              numbers: cardHash,
+            });
             
             await supabaseClient
               .from('bingo_cards')
@@ -293,11 +311,13 @@ serve(async (req) => {
         .eq('room_id', room.id);
 
       if (players) {
+        console.log(`CARD_GEN: Creating cards for round ${nextRoundNumber} - ${players.length} players, ${room.cards_per_player} cards each`);
+        
         for (let playerIndex = 0; playerIndex < players.length; playerIndex++) {
           const player = players[playerIndex];
           
           for (let cardNum = 1; cardNum <= room.cards_per_player; cardNum++) {
-            const cardNumbers = await generateBingoCardDeterministic({
+            const cardNumbers = generateBingoCardSync({
               roomId: room.id,
               roundId: newRound.id,
               playerId: player.id,
@@ -305,7 +325,16 @@ serve(async (req) => {
               freeCenter: room.free_center,
             });
             
-            const cardHash = await sha256Hex(cardNumbers.join(','));
+            const cardHash = cardNumbers.join(',');
+            
+            console.log('CARD_GEN', {
+              roomId: room.id,
+              roundId: newRound.id,
+              playerId: player.id,
+              playerName: player.player_name,
+              cardNum,
+              numbers: cardHash,
+            });
             
             await supabaseClient
               .from('bingo_cards')
