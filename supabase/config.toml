@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.game-controller]
 verify_jwt = false
+
+[functions.calculate-points]
+verify_jwt = false
