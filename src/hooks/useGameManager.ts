@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { generateRoomCode } from '@/lib/bingo';
-import { GameRoom } from '@/types/game';
 
 export const useGameManager = () => {
   const [loading, setLoading] = useState(false);
@@ -14,9 +12,6 @@ export const useGameManager = () => {
     setLoading(true);
     
     try {
-      // For demo purposes, we'll create a simple room and navigate to it
-      // In a real app, this would create actual database records
-      
       const roomCode = generateRoomCode();
       
       // Simulate API call delay
@@ -46,15 +41,13 @@ export const useGameManager = () => {
     setLoading(true);
     
     try {
-      // For demo purposes, we'll just navigate to the lobby
-      // In a real app, this would validate the room code and add the player
-      
       if (roomCode.length !== 5) {
         toast({
           title: "Invalid Room Code",
           description: "Room code must be exactly 5 characters.",
           variant: "destructive",
         });
+        setLoading(false);
         return;
       }
       
