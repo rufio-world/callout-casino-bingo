@@ -238,26 +238,71 @@ const Game = () => {
     newMarkedPositions[numberIndex] = !newMarkedPositions[numberIndex];
 
     try {
-      // Update card in database
-      const { error } = await supabase
-        .from('bingo_cards')
-        .update({ marked_positions: newMarkedPositions })
-        .eq('id', card.id);
+      // Call the edge function to calculate points and update the database
+      const { data, error } = await supabase.functions.invoke('calculate-points', {
+        body: {
+          cardId: card.id,
+          markedPositions: newMarkedPositions
+        }
+      });
 
       if (error) {
-        console.error('Error updating card:', error);
+        console.error('Error calculating points:', error);
         return;
       }
 
-      // Update local state
+      const result = data;
+      console.log('Points calculation result:', result);
+
+      // Update local state with new card data
       setCards(prev => prev.map((c, i) => 
         i === cardIndex 
-          ? { ...c, marked_positions: newMarkedPositions }
+          ? { 
+              ...c, 
+              marked_positions: newMarkedPositions,
+              points_earned: result.points,
+              is_winner: result.isWinner
+            }
           : c
       ));
 
+      // Update player total score if current player
+      if (currentPlayer && result.totalScore !== undefined) {
+        setPlayers(prev => prev.map(p => 
+          p.id === currentPlayer.id 
+            ? { ...p, total_score: result.totalScore }
+            : p
+        ));
+      }
+
+      // Show celebration for bingo
+      if (result.isWinner && !card.is_winner) {
+        toast({
+          title: "🎉 BINGO!",
+          description: `You got a full card! +${result.points} points`,
+          duration: 5000,
+        });
+      } else if (result.patterns?.middleCross && result.points > (card.points_earned || 0)) {
+        toast({
+          title: "✨ Middle Cross!",
+          description: "+2 bonus points for middle cross pattern",
+          duration: 3000,
+        });
+      } else if (result.patterns?.corners && result.points > (card.points_earned || 0)) {
+        toast({
+          title: "🎯 Corners!",
+          description: "+1 bonus point for all corners",
+          duration: 3000,
+        });
+      }
+
     } catch (error) {
       console.error('Error updating card:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update card. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 

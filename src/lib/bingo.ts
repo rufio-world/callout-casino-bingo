@@ -91,12 +91,13 @@ export const getGridPosition = (index: number): { row: number; col: number } => 
   };
 };
 
-// Check for bingo patterns (lines, full card, corners)
+// Check for bingo patterns (lines, full card, corners, middle cross)
 export const checkBingoPatterns = (markedPositions: boolean[]) => {
   const patterns = {
     lines: 0,
     bingo: false,
-    corners: false
+    corners: false,
+    middleCross: false
   };
   
   // Check rows
@@ -124,6 +125,11 @@ export const checkBingoPatterns = (markedPositions: boolean[]) => {
   // Check corners (0, 4, 20, 24)
   patterns.corners = [0, 4, 20, 24].every(pos => markedPositions[pos]);
   
+  // Check middle cross (middle row + middle column)
+  const middleRow = [10, 11, 12, 13, 14].every(pos => markedPositions[pos]); // Row 2 (0-indexed)
+  const middleCol = [2, 7, 12, 17, 22].every(pos => markedPositions[pos]);   // Col 2 (0-indexed)
+  patterns.middleCross = middleRow && middleCol;
+  
   return patterns;
 };
 
@@ -132,7 +138,8 @@ export const calculatePoints = (
   linesCompleted: number,
   hasBingo: boolean,
   hasCorners: boolean,
-  multiCardBonus: number
+  hasMiddleCross: boolean,
+  multiCardBonus: number = 0
 ): number => {
   let points = 0;
   
@@ -144,6 +151,9 @@ export const calculatePoints = (
   
   // 1 point for corners bonus
   if (hasCorners) points += 1;
+  
+  // 2 points for middle cross (middle row + middle column)
+  if (hasMiddleCross) points += 2;
   
   // Multi-card bonus points
   points += multiCardBonus;

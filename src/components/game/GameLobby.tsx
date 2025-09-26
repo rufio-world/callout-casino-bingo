@@ -193,7 +193,9 @@ const GameLobby: React.FC<GameLobbyProps> = ({
                   <div>• New number every 4 seconds</div>
                   <div>• 2 points per line completed</div>
                   <div>• 4 points for full BINGO</div>
-                  <div>• Bonus points for corners & multi-cards</div>
+                  <div>• 1 point for all corners</div>
+                  <div>• 2 points for middle cross (row + column)</div>
+                  <div>• Bonus points for multi-cards</div>
                 </div>
               </CardContent>
             </Card>

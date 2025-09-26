@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { getBingoLetter, getGridPosition, checkBingoPatterns } from '@/lib/bingo';
+import { getBingoLetter, getGridPosition, checkBingoPatterns, calculatePoints } from '@/lib/bingo';
 
 interface BingoCardProps {
   numbers: number[];
@@ -122,8 +122,18 @@ const BingoCard: React.FC<BingoCardProps> = ({
 
       {/* Card Stats */}
       <div className="flex justify-between items-center mt-3 text-xs text-muted-foreground">
-        <div>Lines: {patterns.lines}</div>
+        <div className="flex gap-3">
+          <span>Lines: {patterns.lines}</span>
+          <span className="text-secondary font-semibold">
+            Points: {calculatePoints(patterns.lines, patterns.bingo, patterns.corners, patterns.middleCross)}
+          </span>
+        </div>
         <div className="flex gap-2">
+          {patterns.middleCross && (
+            <span className="bg-secondary/20 px-2 py-1 rounded text-secondary font-bold">
+              Cross
+            </span>
+          )}
           {patterns.corners && (
             <span className="bg-accent/50 px-2 py-1 rounded text-accent-foreground">
               Corners
