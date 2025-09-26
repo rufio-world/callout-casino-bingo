@@ -17,8 +17,9 @@ interface GameRound {
   status: string;
 }
 
-// --- Deterministic seed helpers (synchronous) --------------------------------------------
-// Deterministic PRNG: xmur3 + sfc32
+// --- Deterministic synchronous card generation --------------------------------------------
+
+// Deterministic PRNG: xmur3 + sfc32 (synchronous, no crypto needed)
 function xmur3(str: string) {
   let h = 1779033703 ^ str.length;
   for (let i = 0; i < str.length; i++) {
@@ -66,16 +67,17 @@ function sampleSorted(min: number, max: number, k: number, rnd: () => number): n
   return pool.slice(0, k).sort((a, b) => a - b);
 }
 
-// --- Deterministic 5x5 bingo card (US 75-ball) - SYNCHRONOUS ------------------------------
+// 75-ball bingo, 5x5 grid. FREE center = 0 if enabled. SYNCHRONOUS.
 function generateBingoCardSync(params: {
   roomId: string;
   roundId: string;
   playerId: string;
   cardNumber: number;
   freeCenter?: boolean;
+  nonce?: number;
 }): number[] {
-  const { roomId, roundId, playerId, cardNumber, freeCenter = true } = params;
-  const seedStr = `${roomId}|${roundId}|${playerId}|${cardNumber}|free:${freeCenter ? 1 : 0}`;
+  const { roomId, roundId, playerId, cardNumber, freeCenter = true, nonce = 0 } = params;
+  const seedStr = `${roomId}|${roundId}|${playerId}|${cardNumber}|free:${freeCenter ? 1 : 0}|nonce:${nonce}`;
   const rnd = rngFromString(seedStr);
 
   const c = new Array<number>(25);
@@ -101,6 +103,62 @@ function generateBingoCardSync(params: {
   c[4] = o[0]; c[9] = o[1]; c[14] = o[2]; c[19] = o[3]; c[24] = o[4];
 
   return c;
+}
+
+// Helper for card insertion with retry on duplicate hash
+async function insertCardWithRetry(
+  supabaseClient: any,
+  room: any,
+  roundId: string,
+  player: any,
+  cardNum: number,
+  maxRetries = 5
+) {
+  for (let nonce = 0; nonce < maxRetries; nonce++) {
+    try {
+      const cardNumbers = generateBingoCardSync({
+        roomId: room.id,
+        roundId: roundId,
+        playerId: player.id,
+        cardNumber: cardNum,
+        freeCenter: room.free_center,
+        nonce,
+      });
+      
+      const cardHash = cardNumbers.join(',');
+      
+      console.log('CARD_GEN', {
+        roomId: room.id,
+        roundId: roundId,
+        playerId: player.id,
+        cardNum,
+        nonce,
+        numbers: cardHash,
+      });
+      
+      await supabaseClient
+        .from('bingo_cards')
+        .insert({
+          room_player_id: player.id,
+          round_id: roundId,
+          card_number: cardNum,
+          numbers: cardNumbers,
+          marked_positions: Array(25).fill(false),
+          is_winner: false,
+          points_earned: 0,
+          card_hash: cardHash
+        });
+        
+      return; // Success, exit retry loop
+    } catch (error: any) {
+      if (error?.code === '23505' && nonce < maxRetries - 1) {
+        // Duplicate key error, try again with incremented nonce
+        console.log(`Card hash collision, retrying with nonce ${nonce + 1}`);
+        continue;
+      }
+      throw error; // Re-throw if it's not a duplicate error or we've exhausted retries
+    }
+  }
 }
 
 // Generate bingo numbers with proper column validation
@@ -201,43 +259,11 @@ serve(async (req) => {
         .eq('room_id', room.id);
 
       if (players) {
-        console.log(`CARD_GEN: Creating cards for ${players.length} players, ${room.cards_per_player} cards each`);
-        
         for (let playerIndex = 0; playerIndex < players.length; playerIndex++) {
           const player = players[playerIndex];
           
           for (let cardNum = 1; cardNum <= room.cards_per_player; cardNum++) {
-            const cardNumbers = generateBingoCardSync({
-              roomId: room.id,
-              roundId: round.id,
-              playerId: player.id,
-              cardNumber: cardNum,
-              freeCenter: room.free_center,
-            });
-            
-            const cardHash = cardNumbers.join(',');
-            
-            console.log('CARD_GEN', {
-              roomId: room.id,
-              roundId: round.id,
-              playerId: player.id,
-              playerName: player.player_name,
-              cardNum,
-              numbers: cardHash,
-            });
-            
-            await supabaseClient
-              .from('bingo_cards')
-              .insert({
-                room_player_id: player.id,
-                round_id: round.id,
-                card_number: cardNum,
-                numbers: cardNumbers,
-                marked_positions: Array(25).fill(false),
-                is_winner: false,
-                points_earned: 0,
-                card_hash: cardHash
-              });
+            await insertCardWithRetry(supabaseClient, room, round.id, player, cardNum);
           }
         }
       }
@@ -311,43 +337,11 @@ serve(async (req) => {
         .eq('room_id', room.id);
 
       if (players) {
-        console.log(`CARD_GEN: Creating cards for round ${nextRoundNumber} - ${players.length} players, ${room.cards_per_player} cards each`);
-        
         for (let playerIndex = 0; playerIndex < players.length; playerIndex++) {
           const player = players[playerIndex];
           
           for (let cardNum = 1; cardNum <= room.cards_per_player; cardNum++) {
-            const cardNumbers = generateBingoCardSync({
-              roomId: room.id,
-              roundId: newRound.id,
-              playerId: player.id,
-              cardNumber: cardNum,
-              freeCenter: room.free_center,
-            });
-            
-            const cardHash = cardNumbers.join(',');
-            
-            console.log('CARD_GEN', {
-              roomId: room.id,
-              roundId: newRound.id,
-              playerId: player.id,
-              playerName: player.player_name,
-              cardNum,
-              numbers: cardHash,
-            });
-            
-            await supabaseClient
-              .from('bingo_cards')
-              .insert({
-                room_player_id: player.id,
-                round_id: newRound.id,
-                card_number: cardNum,
-                numbers: cardNumbers,
-                marked_positions: Array(25).fill(false),
-                is_winner: false,
-                points_earned: 0,
-                card_hash: cardHash
-              });
+            await insertCardWithRetry(supabaseClient, room, newRound.id, player, cardNum);
           }
         }
       }
