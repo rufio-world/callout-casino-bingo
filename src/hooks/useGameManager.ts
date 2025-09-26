@@ -8,7 +8,17 @@ export const useGameManager = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const createGame = async (playerName: string, avatarName: string, isHost = true) => {
+  const createGame = async (
+    playerName: string, 
+    avatarName: string, 
+    isHost = true, 
+    gameSettings?: {
+      roundsTotal: number;
+      cardsPerPlayer: number;
+      freeCenter: boolean;
+      maxPlayers: number;
+    }
+  ) => {
     setLoading(true);
     
     try {
@@ -60,7 +70,11 @@ export const useGameManager = () => {
         .insert({
           room_code: roomCode,
           host_id: profile.id,
-          status: 'waiting'
+          status: 'waiting',
+          rounds_total: gameSettings?.roundsTotal || 5,
+          cards_per_player: gameSettings?.cardsPerPlayer || 1,
+          free_center: gameSettings?.freeCenter ?? true,
+          max_players: gameSettings?.maxPlayers || 10
         })
         .select()
         .single();

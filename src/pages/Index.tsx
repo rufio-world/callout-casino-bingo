@@ -137,7 +137,7 @@ const Index = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card 
                 className="bg-gradient-room border-primary/20 hover:border-primary/40 transition-all cursor-pointer hover:scale-105 hover:shadow-casino"
-                onClick={() => setGameMode('create')}
+                onClick={() => navigate('/configure-game')}
               >
                 <CardHeader className="text-center">
                   <div className="mx-auto mb-4 w-16 h-16 bg-gradient-casino rounded-full flex items-center justify-center">
