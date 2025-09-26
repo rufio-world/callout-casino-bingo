@@ -1,1 +1,4 @@
 project_id = "wtqulphcvsudbgbreqjm"
+
+[functions.game-manager]
+verify_jwt = false

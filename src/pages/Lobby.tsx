@@ -125,17 +125,16 @@ const Lobby = () => {
     if (!room || !currentPlayer) return;
 
     try {
-      // Update room status to in_progress
-      const { error: updateError } = await supabase
-        .from('game_rooms')
-        .update({ 
-          status: 'in_progress',
-          current_round_number: 1 
-        })
-        .eq('id', room.id);
+      // Call game manager edge function to start the game
+      const { error } = await supabase.functions.invoke('game-manager', {
+        body: { 
+          action: 'start_game',
+          roomId: room.id
+        }
+      });
 
-      if (updateError) {
-        console.error('Error starting game:', updateError);
+      if (error) {
+        console.error('Error starting game:', error);
         toast({
           title: "Error",
           description: "Failed to start the game.",
@@ -143,9 +142,6 @@ const Lobby = () => {
         });
         return;
       }
-
-      // Navigate to game view
-      navigate(`/game/${roomCode}`);
       
     } catch (error) {
       console.error('Error starting game:', error);
