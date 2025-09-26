@@ -62,7 +62,15 @@ const Game = () => {
     let drawIndex = 0;
 
     const drawInterval = setInterval(() => {
-      if (drawIndex >= drawSequence.length || timeRemaining <= 0) {
+      setTimeRemaining(current => {
+        if (current <= 0) {
+          setGameActive(false);
+          return 0;
+        }
+        return current;
+      });
+
+      if (drawIndex >= drawSequence.length) {
         setGameActive(false);
         clearInterval(drawInterval);
         return;
@@ -81,7 +89,7 @@ const Game = () => {
     }, 4000);
 
     return () => clearInterval(drawInterval);
-  }, [gameActive, timeRemaining]);
+  }, [gameActive]);
 
   const handleStartGame = () => {
     setGameActive(true);
