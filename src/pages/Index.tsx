@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AvatarSelector from '@/components/ui/avatar-selector';
 import { Plus, Users, Trophy, Sparkles, Volume2, LogIn, LogOut, User } from 'lucide-react';
+import { ProfileDialog } from '@/components/profile/ProfileDialog';
 import { cn } from '@/lib/utils';
 import { getRandomAvatar } from '@/lib/avatars';
 import { useGameManager } from '@/hooks/useGameManager';
@@ -70,15 +71,18 @@ const Index = () => {
                   <User className="w-4 h-4" />
                   <span className="text-sm text-foreground">Welcome back!</span>
                 </div>
-                <Button 
-                  onClick={signOut}
-                  variant="outline" 
-                  size="sm"
-                  className="bg-transparent border-primary/20 hover:bg-primary/10"
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Sign Out
-                </Button>
+                <div className="flex items-center gap-2">
+                  <ProfileDialog />
+                  <Button 
+                    onClick={signOut}
+                    variant="outline" 
+                    size="sm"
+                    className="bg-transparent border-primary/20 hover:bg-primary/10"
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Sign Out
+                  </Button>
+                </div>
               </div>
             ) : (
               <Button 
