@@ -150,77 +150,8 @@ const GameLobby: React.FC<GameLobbyProps> = ({
             </Card>
           </div>
 
-          {/* Game Settings & Controls */}
+          {/* Game Info & Controls */}
           <div className="space-y-6">
-            {/* Game Settings (Host Only) */}
-            {isHost && (
-              <Card className="bg-card/50 border-primary/20">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Settings className="h-5 w-5" />
-                    Game Settings
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Number of Rounds</Label>
-                    <Select
-                      value={room.rounds_total.toString()}
-                      onValueChange={(value) => onUpdateSettings({ rounds_total: parseInt(value) })}
-                    >
-                      <SelectTrigger className="bg-card/50">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-                          <SelectItem key={num} value={num.toString()}>
-                            {num} Rounds
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Cards per Player</Label>
-                    <Select
-                      value={room.cards_per_player.toString()}
-                      onValueChange={(value) => onUpdateSettings({ cards_per_player: parseInt(value) })}
-                    >
-                      <SelectTrigger className="bg-card/50">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[1, 2, 3, 4].map((num) => (
-                          <SelectItem key={num} value={num.toString()}>
-                            {num} Card{num > 1 ? 's' : ''}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="free-center">Free Center Space</Label>
-                    <Switch
-                      id="free-center"
-                      checked={room.free_center}
-                      onCheckedChange={(checked) => onUpdateSettings({ free_center: checked })}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="visual-hints">Visual Number Hints</Label>
-                    <Switch
-                      id="visual-hints"
-                      checked={room.visual_hints}
-                      onCheckedChange={(checked) => onUpdateSettings({ visual_hints: checked })}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             {/* Game Info */}
             <Card className="bg-card/50 border-primary/20">
               <CardHeader>
