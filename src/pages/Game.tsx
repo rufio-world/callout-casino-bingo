@@ -201,14 +201,16 @@ const Game = () => {
     }
   };
 
-  // Timer countdown
+  // Timer countdown and fallback round completion check
   useEffect(() => {
     if (!currentRound || currentRound.status !== 'active') return;
 
     const interval = setInterval(() => {
       setTimeRemaining(prev => {
         if (prev <= 1) {
-          // Round should be ending
+          // Round time is up - trigger completion as fallback
+          console.log('Timer reached 0 - triggering fallback round completion');
+          handleRoundComplete();
           return 0;
         }
         return prev - 1;
@@ -289,6 +291,12 @@ const Game = () => {
         const elapsed = Math.floor((now - startTime) / 1000);
         const remaining = Math.max(0, 240 - elapsed);
         setTimeRemaining(remaining);
+        
+        // Check if round should have completed but status wasn't updated
+        if (elapsed >= 240 && roundData.status === 'active') {
+          console.log('Round should have completed but status is still active - triggering completion');
+          setTimeout(() => handleRoundComplete(), 1000);
+        }
       }
 
       // Load bingo cards for current player after identifying them
