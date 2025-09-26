@@ -189,18 +189,17 @@ serve(async (req) => {
         .eq('room_id', room.id);
 
       if (players) {
-        // Shuffle players to ensure card generation order doesn't affect uniqueness
-        const shuffledPlayers = [...players].sort(() => Math.random() - 0.5);
-        
-        for (let playerIndex = 0; playerIndex < shuffledPlayers.length; playerIndex++) {
-          const player = shuffledPlayers[playerIndex];
+        for (let playerIndex = 0; playerIndex < players.length; playerIndex++) {
+          const player = players[playerIndex];
           
           for (let cardNum = 1; cardNum <= room.cards_per_player; cardNum++) {
-            // Use player index and card number for unique card generation
-            const cardNumbers = generateBingoCard(room.free_center, playerIndex, cardNum);
+            // Use unique player ID hash and timestamp for maximum uniqueness
+            const playerSeed = player.id.split('-').join('').slice(0, 8);
+            const uniqueSeed = parseInt(playerSeed, 16) + playerIndex * 10000 + cardNum * 1000 + Date.now();
+            const cardNumbers = generateBingoCard(room.free_center, uniqueSeed, cardNum);
             
             // Add small delay to ensure different timestamps
-            await new Promise(resolve => setTimeout(resolve, 1));
+            await new Promise(resolve => setTimeout(resolve, 2));
             
             await supabaseClient
               .from('bingo_cards')
@@ -286,15 +285,16 @@ serve(async (req) => {
         .eq('room_id', room.id);
 
       if (players) {
-        const shuffledPlayers = [...players].sort(() => Math.random() - 0.5);
-        
-        for (let playerIndex = 0; playerIndex < shuffledPlayers.length; playerIndex++) {
-          const player = shuffledPlayers[playerIndex];
+        for (let playerIndex = 0; playerIndex < players.length; playerIndex++) {
+          const player = players[playerIndex];
           
           for (let cardNum = 1; cardNum <= room.cards_per_player; cardNum++) {
-            const cardNumbers = generateBingoCard(room.free_center, playerIndex, cardNum);
+            // Use unique player ID hash and timestamp for maximum uniqueness
+            const playerSeed = player.id.split('-').join('').slice(0, 8);
+            const uniqueSeed = parseInt(playerSeed, 16) + playerIndex * 10000 + cardNum * 1000 + Date.now();
+            const cardNumbers = generateBingoCard(room.free_center, uniqueSeed, cardNum);
             
-            await new Promise(resolve => setTimeout(resolve, 1));
+            await new Promise(resolve => setTimeout(resolve, 2));
             
             await supabaseClient
               .from('bingo_cards')
