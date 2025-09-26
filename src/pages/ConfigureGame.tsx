@@ -1,20 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AvatarSelector from '@/components/ui/avatar-selector';
 import { ArrowLeft, Settings, Users, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getRandomAvatar } from '@/lib/avatars';
 import { useGameManager } from '@/hooks/useGameManager';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import bingoBackground from '@/assets/bingo-bg.jpg';
 
 const ConfigureGame = () => {
   const navigate = useNavigate();
   const { createGame, loading } = useGameManager();
+  const { user } = useAuth();
   
   const [playerName, setPlayerName] = useState('');
   const [selectedAvatar, setSelectedAvatar] = useState(() => getRandomAvatar().name);
@@ -22,9 +26,35 @@ const ConfigureGame = () => {
     roundsTotal: 5,
     cardsPerPlayer: 1,
     freeCenter: true,
-    maxPlayers: 10,
+    maxPlayers: 10, // Fixed at 10, not editable
     visualHints: true
   });
+
+  // Load user profile on mount
+  useEffect(() => {
+    if (user) {
+      loadUserProfile();
+    }
+  }, [user]);
+
+  const loadUserProfile = async () => {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('username, avatar_name')
+        .eq('user_id', user?.id)
+        .single();
+
+      if (profile) {
+        setPlayerName(profile.username || '');
+        if (profile.avatar_name && profile.avatar_name !== 'default-avatar') {
+          setSelectedAvatar(profile.avatar_name);
+        }
+      }
+    } catch (error) {
+      console.log('No profile found, using defaults');
+    }
+  };
 
   const handleCreateGame = async () => {
     const finalPlayerName = playerName || `Host ${Math.floor(Math.random() * 1000)}`;
@@ -141,54 +171,48 @@ const ConfigureGame = () => {
                   <Label htmlFor="rounds" className="font-semibold">
                     Number of Rounds
                   </Label>
-                  <Input
-                    id="rounds"
-                    type="number"
-                    min="1"
-                    max="20"
-                    value={gameSettings.roundsTotal}
-                    onChange={(e) => setGameSettings(prev => ({ 
+                  <Select 
+                    value={gameSettings.roundsTotal.toString()} 
+                    onValueChange={(value) => setGameSettings(prev => ({ 
                       ...prev, 
-                      roundsTotal: parseInt(e.target.value) || 5 
+                      roundsTotal: parseInt(value) 
                     }))}
-                    className="bg-card/50 border-primary/20"
-                  />
+                  >
+                    <SelectTrigger className="bg-card/50 border-primary/20">
+                      <SelectValue placeholder="Select rounds" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-primary/20 z-50">
+                      {[3, 4, 5, 6, 7, 8, 9, 10].map((rounds) => (
+                        <SelectItem key={rounds} value={rounds.toString()}>
+                          {rounds} {rounds === 1 ? 'Round' : 'Rounds'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="cards" className="font-semibold">
                     Cards per Player
                   </Label>
-                  <Input
-                    id="cards"
-                    type="number"
-                    min="1"
-                    max="4"
-                    value={gameSettings.cardsPerPlayer}
-                    onChange={(e) => setGameSettings(prev => ({ 
+                  <Select 
+                    value={gameSettings.cardsPerPlayer.toString()} 
+                    onValueChange={(value) => setGameSettings(prev => ({ 
                       ...prev, 
-                      cardsPerPlayer: parseInt(e.target.value) || 1 
+                      cardsPerPlayer: parseInt(value) 
                     }))}
-                    className="bg-card/50 border-primary/20"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="maxPlayers" className="font-semibold">
-                    Max Players
-                  </Label>
-                  <Input
-                    id="maxPlayers"
-                    type="number"
-                    min="2"
-                    max="10"
-                    value={gameSettings.maxPlayers}
-                    onChange={(e) => setGameSettings(prev => ({ 
-                      ...prev, 
-                      maxPlayers: parseInt(e.target.value) || 10 
-                    }))}
-                    className="bg-card/50 border-primary/20"
-                  />
+                  >
+                    <SelectTrigger className="bg-card/50 border-primary/20">
+                      <SelectValue placeholder="Select cards" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-primary/20 z-50">
+                      {[1, 2, 3, 4].map((cards) => (
+                        <SelectItem key={cards} value={cards.toString()}>
+                          {cards} {cards === 1 ? 'Card' : 'Cards'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="flex items-center justify-between">
@@ -240,7 +264,7 @@ const ConfigureGame = () => {
                 Game Summary
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
+            <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
               <div>
                 <p className="text-2xl font-bold text-accent">{gameSettings.roundsTotal}</p>
                 <p className="text-sm text-muted-foreground">Rounds</p>
@@ -248,10 +272,6 @@ const ConfigureGame = () => {
               <div>
                 <p className="text-2xl font-bold text-accent">{gameSettings.cardsPerPlayer}</p>
                 <p className="text-sm text-muted-foreground">Cards Each</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-accent">{gameSettings.maxPlayers}</p>
-                <p className="text-sm text-muted-foreground">Max Players</p>
               </div>
               <div>
                 <p className="text-2xl font-bold text-accent">{gameSettings.freeCenter ? 'Yes' : 'No'}</p>
