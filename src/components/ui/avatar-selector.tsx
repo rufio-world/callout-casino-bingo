@@ -106,7 +106,7 @@ const AvatarSelector: React.FC<AvatarSelectorProps> = ({
             })}
           </div>
 
-          {/* Avatar Grid */}
+           {/* Avatar Grid */}
           <div className="grid grid-cols-6 gap-3 max-h-64 overflow-y-auto pr-2">
             {filteredAvatars.map((avatar) => (
               <button
@@ -121,10 +121,7 @@ const AvatarSelector: React.FC<AvatarSelectorProps> = ({
                 )}
                 title={avatar.name}
               >
-                <div className="text-3xl mb-1">{avatar.image}</div>
-                <div className="text-xs font-medium text-foreground/80 truncate">
-                  {avatar.name}
-                </div>
+                <div className="text-4xl">{avatar.image}</div>
                 {selectedAvatar === avatar.name && (
                   <div className="absolute -top-1 -right-1 w-3 h-3 bg-secondary rounded-full border-2 border-background" />
                 )}

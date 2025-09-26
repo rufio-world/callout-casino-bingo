@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import AvatarSelector from '@/components/ui/avatar-selector';
 import { ArrowLeft, Settings, Users, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getRandomAvatar } from '@/lib/avatars';
+import { AVATAR_OPTIONS, getRandomAvatar } from '@/lib/avatars';
 import { useGameManager } from '@/hooks/useGameManager';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -143,10 +143,10 @@ const ConfigureGame = () => {
                         className="w-full bg-card/50 hover:bg-accent border-primary/20 h-12"
                       >
                         <span className="text-2xl mr-3">
-                          {getRandomAvatar().image}
+                          {AVATAR_OPTIONS.find(a => a.name === selectedAvatar)?.image || '👤'}
                         </span>
                         <span className="flex-1">
-                          {selectedAvatar || 'Choose Avatar'}
+                          Choose Avatar
                         </span>
                       </Button>
                     }

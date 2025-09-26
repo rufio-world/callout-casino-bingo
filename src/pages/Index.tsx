@@ -8,7 +8,7 @@ import AvatarSelector from '@/components/ui/avatar-selector';
 import { Plus, Users, Trophy, Sparkles, Volume2, LogIn, LogOut, User } from 'lucide-react';
 import { ProfileDialog } from '@/components/profile/ProfileDialog';
 import { cn } from '@/lib/utils';
-import { getRandomAvatar } from '@/lib/avatars';
+import { getRandomAvatar, AVATAR_OPTIONS } from '@/lib/avatars';
 import { useGameManager } from '@/hooks/useGameManager';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -229,10 +229,10 @@ const Index = () => {
                         className="w-full bg-card/50 hover:bg-accent border-primary/20 h-12"
                       >
                         <span className="text-2xl mr-3">
-                          {getRandomAvatar().image}
+                          {AVATAR_OPTIONS.find(a => a.name === selectedAvatar)?.image || '👤'}
                         </span>
                         <span className="flex-1">
-                          {selectedAvatar || 'Choose Avatar'}
+                          Choose Avatar
                         </span>
                       </Button>
                     }
