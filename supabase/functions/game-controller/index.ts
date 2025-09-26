@@ -108,6 +108,24 @@ serve(async (req) => {
         throw new Error(`Room not found: ${roomError.message}`);
       }
 
+      // Clean up any existing rounds and cards for this room
+      const { data: playerIds } = await supabaseClient
+        .from('room_players')
+        .select('id')
+        .eq('room_id', room.id);
+
+      if (playerIds && playerIds.length > 0) {
+        await supabaseClient
+          .from('bingo_cards')
+          .delete()
+          .in('room_player_id', playerIds.map(p => p.id));
+      }
+
+      await supabaseClient
+        .from('game_rounds')
+        .delete()
+        .eq('room_id', room.id);
+
       // Update room status
       await supabaseClient
         .from('game_rooms')

@@ -23,39 +23,43 @@ const Lobby = () => {
     }
 
     loadRoomData();
-    
+  }, [roomCode, navigate]);
+
+  useEffect(() => {
+    if (!room) return;
+
     // Set up real-time subscriptions for players and room updates
     const playersChannel = supabase
-      .channel('room-players-changes')
+      .channel(`room-players-${roomCode}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'room_players'
+          table: 'room_players',
+          filter: `room_id=eq.${room.id}`
         },
-        () => {
-          // Reload room data when players change
+        (payload) => {
+          console.log('Players changed:', payload);
           loadRoomData();
         }
       )
       .subscribe();
 
     const roomChannel = supabase
-      .channel('game-room-changes')
+      .channel(`game-room-${roomCode}`)
       .on(
         'postgres_changes',
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'game_rooms'
+          table: 'game_rooms',
+          filter: `room_code=eq.${roomCode}`
         },
         (payload) => {
-          // Check if this room's status changed to in_progress
-          if (payload.new.room_code === roomCode && payload.new.status === 'in_progress') {
+          if (payload.new.status === 'in_progress') {
             navigate(`/game/${roomCode}`);
-          } else if (payload.new.room_code === roomCode) {
-            // Update room data for other changes
+          } else {
             setRoom(payload.new as GameRoom);
           }
         }
@@ -66,7 +70,7 @@ const Lobby = () => {
       supabase.removeChannel(playersChannel);
       supabase.removeChannel(roomChannel);
     };
-  }, [roomCode, navigate]);
+  }, [room, roomCode, navigate]);
 
   const loadRoomData = async () => {
     try {
