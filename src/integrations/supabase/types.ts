@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       bingo_cards: {
         Row: {
+          card_hash: string | null
           card_number: number
           created_at: string | null
           id: string
@@ -27,6 +28,7 @@ export type Database = {
           round_id: string | null
         }
         Insert: {
+          card_hash?: string | null
           card_number?: number
           created_at?: string | null
           id?: string
@@ -38,6 +40,7 @@ export type Database = {
           round_id?: string | null
         }
         Update: {
+          card_hash?: string | null
           card_number?: number
           created_at?: string | null
           id?: string

@@ -17,6 +17,85 @@ interface GameRound {
   status: string;
 }
 
+// --- Deterministic seed helpers --------------------------------------------
+async function sha256Hex(input: string): Promise<string> {
+  const enc = new TextEncoder();
+  const digest = await crypto.subtle.digest("SHA-256", enc.encode(input));
+  const bytes = new Uint8Array(digest);
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function mulberry32(seed: number) {
+  return function () {
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function seedFromHex(hex: string): number {
+  return parseInt(hex.slice(0, 8), 16) >>> 0;
+}
+
+function shuffle<T>(arr: T[], rnd: () => number): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function sampleColumn(min: number, max: number, k: number, rnd: () => number): number[] {
+  const pool: number[] = [];
+  for (let n = min; n <= max; n++) pool.push(n);
+  shuffle(pool, rnd);
+  return pool.slice(0, k).sort((a, b) => a - b);
+}
+
+// --- Deterministic 5x5 bingo card (US 75-ball) ------------------------------
+async function generateBingoCardDeterministic({
+  roomId,
+  roundId,
+  playerId,
+  cardNumber,
+  freeCenter = true,
+}: {
+  roomId: string;
+  roundId: string;
+  playerId: string;
+  cardNumber: number;
+  freeCenter?: boolean;
+}): Promise<number[]> {
+  const seedString = `${roomId}:${roundId}:${playerId}:card${cardNumber}:free${freeCenter ? 1 : 0}`;
+  const hex = await sha256Hex(seedString);
+  const rnd = mulberry32(seedFromHex(hex));
+
+  const c = new Array<number>(25);
+
+  const b = sampleColumn(1, 15, 5, rnd);
+  c[0] = b[0]; c[5] = b[1]; c[10] = b[2]; c[15] = b[3]; c[20] = b[4];
+
+  const i = sampleColumn(16, 30, 5, rnd);
+  c[1] = i[0]; c[6] = i[1]; c[11] = i[2]; c[16] = i[3]; c[21] = i[4];
+
+  const nCount = freeCenter ? 4 : 5;
+  const n = sampleColumn(31, 45, nCount, rnd);
+  c[2] = n[0];
+  c[7] = n[1];
+  c[12] = freeCenter ? 0 : n[2];
+  c[17] = freeCenter ? n[2] : n[3];
+  c[22] = freeCenter ? n[3] : n[4];
+
+  const g = sampleColumn(46, 60, 5, rnd);
+  c[3] = g[0]; c[8] = g[1]; c[13] = g[2]; c[18] = g[3]; c[23] = g[4];
+
+  const o = sampleColumn(61, 75, 5, rnd);
+  c[4] = o[0]; c[9] = o[1]; c[14] = o[2]; c[19] = o[3]; c[24] = o[4];
+
+  return c;
+}
+
 // Generate bingo numbers with proper column validation
 const generateDrawSequence = (): number[] => {
   const numbers: number[] = [];
@@ -33,80 +112,6 @@ const generateDrawSequence = (): number[] => {
   }
   
   return numbers;
-};
-
-// Generate bingo cards with proper column structure and cryptographically secure randomness
-const generateBingoCard = (freeCenter: boolean = true, playerIndex: number = 0, cardNumber: number = 1): number[] => {
-  // Initialize 5x5 grid (25 positions)
-  const card: number[] = new Array(25);
-  
-  // Use crypto.getRandomValues for true randomness
-  const getSecureRandom = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967295;
-  
-  // Add additional entropy based on player and card to ensure uniqueness
-  const entropy = Date.now() + playerIndex * 1000 + cardNumber * 100 + Math.floor(getSecureRandom() * 1000000);
-  
-  // B column: 1-15 (positions 0, 5, 10, 15, 20)
-  const bNumbers = generateUniqueNumbers(1, 15, 5, entropy + 1);
-  card[0] = bNumbers[0];
-  card[5] = bNumbers[1];
-  card[10] = bNumbers[2];
-  card[15] = bNumbers[3];
-  card[20] = bNumbers[4];
-  
-  // I column: 16-30 (positions 1, 6, 11, 16, 21)
-  const iNumbers = generateUniqueNumbers(16, 30, 5, entropy + 2);
-  card[1] = iNumbers[0];
-  card[6] = iNumbers[1];
-  card[11] = iNumbers[2];
-  card[16] = iNumbers[3];
-  card[21] = iNumbers[4];
-  
-  // N column: 31-45 (positions 2, 7, 12, 17, 22) - position 12 is center
-  const nNumbers = generateUniqueNumbers(31, 45, freeCenter ? 4 : 5, entropy + 3);
-  card[2] = nNumbers[0];
-  card[7] = nNumbers[1];
-  card[12] = freeCenter ? 0 : nNumbers[2]; // FREE space or regular number
-  card[17] = freeCenter ? nNumbers[2] : nNumbers[3];
-  card[22] = freeCenter ? nNumbers[3] : nNumbers[4];
-  
-  // G column: 46-60 (positions 3, 8, 13, 18, 23)
-  const gNumbers = generateUniqueNumbers(46, 60, 5, entropy + 4);
-  card[3] = gNumbers[0];
-  card[8] = gNumbers[1];
-  card[13] = gNumbers[2];
-  card[18] = gNumbers[3];
-  card[23] = gNumbers[4];
-  
-  // O column: 61-75 (positions 4, 9, 14, 19, 24)
-  const oNumbers = generateUniqueNumbers(61, 75, 5, entropy + 5);
-  card[4] = oNumbers[0];
-  card[9] = oNumbers[1];
-  card[14] = oNumbers[2];
-  card[19] = oNumbers[3];
-  card[24] = oNumbers[4];
-  
-  return card;
-};
-
-const generateUniqueNumbers = (min: number, max: number, count: number, entropy: number = 0): number[] => {
-  const numbers: number[] = [];
-  const available: number[] = [];
-  
-  for (let i = min; i <= max; i++) {
-    available.push(i);
-  }
-  
-  // Use crypto-secure randomness with entropy for better uniqueness
-  for (let i = 0; i < count; i++) {
-    const randomBytes = crypto.getRandomValues(new Uint32Array(1));
-    // Add entropy to the random calculation to ensure different results per player/card
-    const randomIndex = Math.floor(((randomBytes[0] / 4294967295) + (entropy / 1000000)) % 1 * available.length);
-    numbers.push(available[randomIndex]);
-    available.splice(randomIndex, 1);
-  }
-  
-  return numbers.sort((a, b) => a - b);
 };
 
 serve(async (req) => {
@@ -182,7 +187,7 @@ serve(async (req) => {
         throw new Error(`Failed to create round: ${roundError.message}`);
       }
 
-      // Create bingo cards for all players with unique seeds
+      // Create bingo cards for all players with deterministic generation
       const { data: players } = await supabaseClient
         .from('room_players')
         .select('*')
@@ -281,7 +286,7 @@ serve(async (req) => {
         throw new Error(`Failed to create next round: ${newRoundError.message}`);
       }
 
-      // Create new bingo cards for all players
+      // Create new bingo cards for all players with deterministic generation
       const { data: players } = await supabaseClient
         .from('room_players')
         .select('*')
