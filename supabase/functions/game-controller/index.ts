@@ -214,6 +214,101 @@ serve(async (req) => {
       });
     }
 
+    if (action === 'start_next_round') {
+      // Start the next round
+      const { data: room, error: roomError } = await supabaseClient
+        .from('game_rooms')
+        .select('*')
+        .eq('room_code', roomCode)
+        .single();
+
+      if (roomError) {
+        throw new Error(`Room not found: ${roomError.message}`);
+      }
+
+      const nextRoundNumber = room.current_round_number + 1;
+      
+      if (nextRoundNumber > room.rounds_total) {
+        // Game is complete
+        await supabaseClient
+          .from('game_rooms')
+          .update({ status: 'finished' })
+          .eq('id', room.id);
+          
+        return new Response(JSON.stringify({ success: true, gameComplete: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Update room for next round
+      await supabaseClient
+        .from('game_rooms')
+        .update({ 
+          current_round_number: nextRoundNumber,
+          round_start_time: new Date().toISOString()
+        })
+        .eq('id', room.id);
+
+      // Create next round
+      const drawSequence = generateDrawSequence();
+      const { data: newRound, error: newRoundError } = await supabaseClient
+        .from('game_rounds')
+        .insert({
+          room_id: room.id,
+          round_number: nextRoundNumber,
+          start_time: new Date().toISOString(),
+          draw_sequence: drawSequence,
+          current_draw_index: 0,
+          status: 'active'
+        })
+        .select()
+        .single();
+
+      if (newRoundError) {
+        throw new Error(`Failed to create next round: ${newRoundError.message}`);
+      }
+
+      // Create new bingo cards for all players
+      const { data: players } = await supabaseClient
+        .from('room_players')
+        .select('*')
+        .eq('room_id', room.id);
+
+      if (players) {
+        const shuffledPlayers = [...players].sort(() => Math.random() - 0.5);
+        
+        for (let playerIndex = 0; playerIndex < shuffledPlayers.length; playerIndex++) {
+          const player = shuffledPlayers[playerIndex];
+          
+          for (let cardNum = 1; cardNum <= room.cards_per_player; cardNum++) {
+            const uniqueSeed = `${player.id}-${cardNum}-${Date.now()}-${Math.random()}`;
+            const cardNumbers = generateBingoCard(room.free_center, uniqueSeed);
+            
+            await new Promise(resolve => setTimeout(resolve, 1));
+            
+            await supabaseClient
+              .from('bingo_cards')
+              .insert({
+                room_player_id: player.id,
+                round_id: newRound.id,
+                card_number: cardNum,
+                numbers: cardNumbers,
+                marked_positions: Array(25).fill(false),
+                is_winner: false,
+                points_earned: 0
+              });
+          }
+        }
+      }
+
+      // Start the number drawing timer
+      setTimeout(() => drawNumber(supabaseClient, newRound.id), 4000);
+
+      return new Response(JSON.stringify({ success: true, round: newRound }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     return new Response(JSON.stringify({ error: 'Unknown action' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -295,17 +390,22 @@ async function drawNumber(supabaseClient: any, roundId: string) {
       setTimeout(() => drawNumber(supabaseClient, roundId), 4000);
     } else {
       // This will be the last number or we're near the end
-      setTimeout(() => {
+      const remainingTime = Math.max(0, 240 - elapsed);
+      setTimeout(async () => {
         // Final check and end round
-        supabaseClient
-          .from('game_rounds')
-          .update({ 
-            status: 'completed',
-            end_time: new Date().toISOString()
-          })
-          .eq('id', roundId);
-        console.log('Round completed - time limit reached');
-      }, Math.max(0, (240 - elapsed) * 1000)); // Wait until exactly 4 minutes
+        try {
+          await supabaseClient
+            .from('game_rounds')
+            .update({ 
+              status: 'completed',
+              end_time: new Date().toISOString()
+            })
+            .eq('id', roundId);
+          console.log('Round completed - time limit reached');
+        } catch (error) {
+          console.error('Error completing round:', error);
+        }
+      }, Math.max(0, remainingTime * 1000)); // Wait until exactly 4 minutes
     }
 
   } catch (error) {

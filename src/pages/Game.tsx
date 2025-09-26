@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import BingoCard from '@/components/game/BingoCard';
 import NumberDrawDisplay from '@/components/game/NumberDrawDisplay';
+import RoundSummary from '@/components/game/RoundSummary';
 import { DrawnNumber, GameRoom, RoomPlayer, GameRound, BingoCard as BingoCardType } from '@/types/game';
 import { generateBingoCard, getBingoLetter, announceNumber } from '@/lib/bingo';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,6 +29,8 @@ const Game = () => {
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [roundPoints, setRoundPoints] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [showRoundSummary, setShowRoundSummary] = useState(false);
+  const [summaryCountdown, setSummaryCountdown] = useState(10);
 
   // Load game data and set up real-time subscriptions
   useEffect(() => {
@@ -50,8 +53,66 @@ const Game = () => {
         },
         (payload) => {
           if (payload.new) {
-            setCurrentRound(payload.new as GameRound);
-            updateDrawnNumbers(payload.new as GameRound);
+            const newRound = payload.new as GameRound;
+            setCurrentRound(newRound);
+            updateDrawnNumbers(newRound);
+            
+            // Check if round just completed
+            if (payload.old && 
+                (payload.old as any)?.status === 'active' && 
+                newRound.status === 'completed') {
+              handleRoundComplete();
+            }
+            
+            // Check if new round started
+            if (payload.old && 
+                newRound.round_number !== (payload.old as any)?.round_number) {
+              handleNewRoundStart(newRound);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    // Set up real-time subscription for room updates
+    const roomChannel = supabase
+      .channel('game-room-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'game_rooms'
+        },
+        (payload) => {
+          if (payload.new) {
+            setRoom(payload.new as GameRoom);
+          }
+        }
+      )
+      .subscribe();
+
+    // Set up real-time subscription for player score updates
+    const playersChannel = supabase
+      .channel('room-players-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'room_players'
+        },
+        (payload) => {
+          if (payload.new) {
+            const updatedPlayer = payload.new as RoomPlayer;
+            setPlayers(prev => prev.map(p => 
+              p.id === updatedPlayer.id ? updatedPlayer : p
+            ));
+            
+            // Update current player if it's them
+            if (currentPlayer && updatedPlayer.id === currentPlayer.id) {
+              setCurrentPlayer(updatedPlayer);
+            }
           }
         }
       )
@@ -59,8 +120,86 @@ const Game = () => {
 
     return () => {
       supabase.removeChannel(roundChannel);
+      supabase.removeChannel(roomChannel);
+      supabase.removeChannel(playersChannel);
     };
   }, [roomCode, navigate]);
+
+  // Handle round completion
+  const handleRoundComplete = () => {
+    console.log('Round completed - showing summary');
+    setShowRoundSummary(true);
+    setSummaryCountdown(10);
+  };
+
+  // Handle new round start
+  const handleNewRoundStart = (newRound: GameRound) => {
+    console.log('New round started:', newRound.round_number);
+    setShowRoundSummary(false);
+    setTimeRemaining(240);
+    // Reload cards for new round
+    if (currentPlayer) {
+      loadPlayerCards();
+    }
+  };
+
+  // Summary countdown timer
+  useEffect(() => {
+    if (!showRoundSummary) return;
+
+    const interval = setInterval(() => {
+      setSummaryCountdown(prev => {
+        if (prev <= 1) {
+          // Start next round
+          startNextRound();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [showRoundSummary]);
+
+  // Start next round
+  const startNextRound = async () => {
+    if (!roomCode) return;
+    
+    try {
+      console.log('Starting next round...');
+      const { data, error } = await supabase.functions.invoke('game-controller', {
+        body: {
+          action: 'start_next_round',
+          roomCode: roomCode
+        }
+      });
+
+      if (error) {
+        console.error('Error starting next round:', error);
+        return;
+      }
+
+      if (data?.gameComplete) {
+        // Game is finished
+        toast({
+          title: "🎉 Game Complete!",
+          description: "All rounds finished. Check the final scoreboard!",
+          duration: 5000,
+        });
+        // Could navigate to final results or stay on summary
+        return;
+      }
+
+      console.log('Next round started successfully');
+    } catch (error) {
+      console.error('Error starting next round:', error);
+      toast({
+        title: "Error",
+        description: "Failed to start next round",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Timer countdown
   useEffect(() => {
@@ -330,6 +469,20 @@ const Game = () => {
   const isGameActive = currentRound?.status === 'active';
   const roundNumber = room.current_round_number;
   const totalRounds = room.rounds_total;
+
+  // Show round summary screen
+  if (showRoundSummary && currentPlayer) {
+    return (
+      <RoundSummary
+        roundNumber={roundNumber}
+        totalRounds={totalRounds}
+        currentPlayer={currentPlayer}
+        allPlayers={players}
+        playerCards={cards}
+        timeRemaining={summaryCountdown}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-room p-4">
