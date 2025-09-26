@@ -125,11 +125,11 @@ const Lobby = () => {
     if (!room || !currentPlayer) return;
 
     try {
-      // Call game manager edge function to start the game
-      const { error } = await supabase.functions.invoke('game-manager', {
+      // Call game controller edge function to start the game
+      const { error } = await supabase.functions.invoke('game-controller', {
         body: { 
           action: 'start_game',
-          roomId: room.id
+          roomCode: room.room_code
         }
       });
 

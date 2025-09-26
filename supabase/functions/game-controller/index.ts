@@ -1,0 +1,237 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+interface GameRound {
+  id: string;
+  room_id: string;
+  round_number: number;
+  start_time: string;
+  end_time?: string;
+  draw_sequence: number[];
+  current_draw_index: number;
+  status: string;
+}
+
+// Generate bingo numbers with proper column validation
+const generateDrawSequence = (): number[] => {
+  const numbers: number[] = [];
+  
+  // B: 1-15, I: 16-30, N: 31-45, G: 46-60, O: 61-75
+  for (let i = 1; i <= 75; i++) {
+    numbers.push(i);
+  }
+  
+  // Shuffle using Fisher-Yates algorithm
+  for (let i = numbers.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
+  }
+  
+  return numbers;
+};
+
+// Generate bingo cards with proper column structure
+const generateBingoCard = (freeCenter: boolean = true): number[] => {
+  const card: number[] = [];
+  
+  // B column: 1-15 (5 numbers)
+  const bNumbers = generateUniqueNumbers(1, 15, 5);
+  card.push(...bNumbers);
+  
+  // I column: 16-30 (5 numbers)  
+  const iNumbers = generateUniqueNumbers(16, 30, 5);
+  card.push(...iNumbers);
+  
+  // N column: 31-45 (4 or 5 numbers depending on free center)
+  const nNumbers = generateUniqueNumbers(31, 45, freeCenter ? 4 : 5);
+  if (freeCenter) {
+    nNumbers.splice(2, 0, 0); // Insert FREE at position 2
+  }
+  card.push(...nNumbers);
+  
+  // G column: 46-60 (5 numbers)
+  const gNumbers = generateUniqueNumbers(46, 60, 5);
+  card.push(...gNumbers);
+  
+  // O column: 61-75 (5 numbers)
+  const oNumbers = generateUniqueNumbers(61, 75, 5);
+  card.push(...oNumbers);
+  
+  return card;
+};
+
+const generateUniqueNumbers = (min: number, max: number, count: number): number[] => {
+  const numbers: number[] = [];
+  const available: number[] = [];
+  
+  for (let i = min; i <= max; i++) {
+    available.push(i);
+  }
+  
+  for (let i = 0; i < count; i++) {
+    const randomIndex = Math.floor(Math.random() * available.length);
+    numbers.push(available[randomIndex]);
+    available.splice(randomIndex, 1);
+  }
+  
+  return numbers.sort((a, b) => a - b);
+};
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const { action, roomCode } = await req.json();
+    console.log('Game controller action:', action, 'for room:', roomCode);
+
+    if (action === 'start_game') {
+      // Start a new game
+      const { data: room, error: roomError } = await supabaseClient
+        .from('game_rooms')
+        .select('*')
+        .eq('room_code', roomCode)
+        .single();
+
+      if (roomError) {
+        throw new Error(`Room not found: ${roomError.message}`);
+      }
+
+      // Update room status
+      await supabaseClient
+        .from('game_rooms')
+        .update({ 
+          status: 'in_progress',
+          current_round_number: 1,
+          round_start_time: new Date().toISOString()
+        })
+        .eq('id', room.id);
+
+      // Create first round
+      const drawSequence = generateDrawSequence();
+      const { data: round, error: roundError } = await supabaseClient
+        .from('game_rounds')
+        .insert({
+          room_id: room.id,
+          round_number: 1,
+          start_time: new Date().toISOString(),
+          draw_sequence: drawSequence,
+          current_draw_index: 0,
+          status: 'active'
+        })
+        .select()
+        .single();
+
+      if (roundError) {
+        throw new Error(`Failed to create round: ${roundError.message}`);
+      }
+
+      // Create bingo cards for all players
+      const { data: players } = await supabaseClient
+        .from('room_players')
+        .select('*')
+        .eq('room_id', room.id);
+
+      if (players) {
+        for (const player of players) {
+          for (let cardNum = 1; cardNum <= room.cards_per_player; cardNum++) {
+            const cardNumbers = generateBingoCard(room.free_center);
+            
+            await supabaseClient
+              .from('bingo_cards')
+              .insert({
+                room_player_id: player.id,
+                round_id: round.id,
+                card_number: cardNum,
+                numbers: cardNumbers,
+                marked_positions: Array(25).fill(false),
+                is_winner: false,
+                points_earned: 0
+              });
+          }
+        }
+      }
+
+      // Start the number drawing timer
+      setTimeout(() => drawNumber(supabaseClient, round.id), 4000);
+
+      return new Response(JSON.stringify({ success: true, round }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify({ error: 'Unknown action' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (error) {
+    console.error('Game controller error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});
+
+async function drawNumber(supabaseClient: any, roundId: string) {
+  try {
+    // Get current round state
+    const { data: round, error: roundError } = await supabaseClient
+      .from('game_rounds')
+      .select('*')
+      .eq('id', roundId)
+      .single();
+
+    if (roundError || !round || round.status !== 'active') {
+      console.log('Round ended or not found');
+      return;
+    }
+
+    // Check if we should draw another number (240 seconds = 60 numbers max)
+    const startTime = new Date(round.start_time).getTime();
+    const now = Date.now();
+    const elapsed = (now - startTime) / 1000;
+    
+    if (elapsed >= 240 || round.current_draw_index >= round.draw_sequence.length) {
+      // End the round
+      await supabaseClient
+        .from('game_rounds')
+        .update({ 
+          status: 'completed',
+          end_time: new Date().toISOString()
+        })
+        .eq('id', roundId);
+      
+      console.log('Round completed');
+      return;
+    }
+
+    // Draw next number
+    const nextIndex = round.current_draw_index;
+    await supabaseClient
+      .from('game_rounds')
+      .update({ current_draw_index: nextIndex + 1 })
+      .eq('id', roundId);
+
+    console.log('Drew number:', round.draw_sequence[nextIndex]);
+
+    // Schedule next number draw
+    setTimeout(() => drawNumber(supabaseClient, roundId), 4000);
+
+  } catch (error) {
+    console.error('Error drawing number:', error);
+  }
+}
