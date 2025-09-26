@@ -56,11 +56,14 @@ const AvatarSelector: React.FC<AvatarSelectorProps> = ({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="bg-gradient-room border-primary/20 max-w-2xl max-h-[80vh] overflow-hidden">
+      <DialogContent className="bg-gradient-room border-primary/20 max-w-2xl max-h-[80vh] overflow-hidden" aria-describedby="avatar-selector-description">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold bg-gradient-gold bg-clip-text text-transparent">
             Choose Your Avatar
           </DialogTitle>
+          <div id="avatar-selector-description" className="sr-only">
+            Select an avatar from the categories below to represent yourself in the game
+          </div>
         </DialogHeader>
         
         <div className="space-y-4">

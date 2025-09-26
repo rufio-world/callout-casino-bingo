@@ -8,6 +8,7 @@ import AvatarSelector from '@/components/ui/avatar-selector';
 import { Plus, Users, Trophy, Sparkles, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getRandomAvatar } from '@/lib/avatars';
+import { useGameManager } from '@/hooks/useGameManager';
 import bingoBackground from '@/assets/bingo-bg.jpg';
 
 const Index = () => {
@@ -15,19 +16,19 @@ const Index = () => {
   const [roomCode, setRoomCode] = useState('');
   const [selectedAvatar, setSelectedAvatar] = useState(() => getRandomAvatar().name);
   const [gameMode, setGameMode] = useState<'create' | 'join' | null>(null);
+  const { createGame, joinGame, loading } = useGameManager();
 
-  const handleCreateGame = () => {
-    console.log('Creating game with:', { playerName, selectedAvatar });
-    // TODO: Navigate to lobby as host
+  const handleCreateGame = async () => {
+    const finalPlayerName = playerName || `Player ${Math.floor(Math.random() * 1000)}`;
+    await createGame(finalPlayerName, selectedAvatar, true);
   };
 
-  const handleJoinGame = () => {
-    console.log('Joining game:', { roomCode, playerName, selectedAvatar });
-    // TODO: Navigate to lobby as player
+  const handleJoinGame = async () => {
+    const finalPlayerName = playerName || `Player ${Math.floor(Math.random() * 1000)}`;
+    await joinGame(roomCode, finalPlayerName, selectedAvatar);
   };
 
   const handlePlayAnonymously = () => {
-    console.log('Playing anonymously');
     if (gameMode === 'create') {
       handleCreateGame();
     } else {
@@ -202,20 +203,22 @@ const Index = () => {
                 <div className="space-y-3">
                   <Button
                     onClick={playerName ? (gameMode === 'create' ? handleCreateGame : handleJoinGame) : handlePlayAnonymously}
-                    disabled={gameMode === 'join' && roomCode.length !== 5}
-                    className="w-full bg-gradient-casino hover:opacity-90 text-primary-foreground shadow-casino h-12 text-lg font-bold"
+                    disabled={(gameMode === 'join' && roomCode.length !== 5) || loading}
+                    variant="casino"
+                    size="xl"
+                    className="w-full"
                   >
-                    {gameMode === 'create' ? 'Create Game' : 'Join Game'}
+                    {loading ? 'Please wait...' : (gameMode === 'create' ? 'Create Game' : 'Join Game')}
                   </Button>
                   
                   {!playerName && (
                     <Button
                       onClick={handlePlayAnonymously}
-                      disabled={gameMode === 'join' && roomCode.length !== 5}
+                      disabled={(gameMode === 'join' && roomCode.length !== 5) || loading}
                       variant="outline"
                       className="w-full border-secondary/50 hover:bg-secondary/10"
                     >
-                      Play Anonymously
+                      {loading ? 'Please wait...' : 'Play Anonymously'}
                     </Button>
                   )}
                   
