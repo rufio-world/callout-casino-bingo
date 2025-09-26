@@ -107,8 +107,26 @@ const Game = () => {
 
       setPlayers(playersData || []);
       
-      // Set current player (first player for demo)
-      if (playersData && playersData.length > 0) {
+      // Find current player based on authenticated user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && playersData) {
+        // Find player by matching user_id through profile
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+          
+        if (profile) {
+          const currentPlayerData = playersData.find(p => p.profile_id === profile.id);
+          if (currentPlayerData) {
+            setCurrentPlayer(currentPlayerData);
+          }
+        }
+      }
+      
+      // Fallback to first player for demo/anonymous users
+      if (!currentPlayer && playersData && playersData.length > 0) {
         setCurrentPlayer(playersData[0]);
       }
 
@@ -132,22 +150,40 @@ const Game = () => {
         setTimeRemaining(remaining);
       }
 
-      // Load bingo cards
-      if (playersData && playersData.length > 0) {
-        const { data: cardsData, error: cardsError } = await supabase
-          .from('bingo_cards')
-          .select('*')
-          .eq('room_player_id', playersData[0].id);
-
-        if (!cardsError && cardsData) {
-          setCards(cardsData);
-        }
-      }
+      // Load bingo cards for current player after identifying them
+      // This will be done after setting currentPlayer
 
     } catch (error) {
       console.error('Error loading game:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Load cards when currentPlayer changes
+  useEffect(() => {
+    if (currentPlayer && currentRound) {
+      loadPlayerCards();
+    }
+  }, [currentPlayer, currentRound]);
+
+  const loadPlayerCards = async () => {
+    if (!currentPlayer || !currentRound) return;
+    
+    try {
+      const { data: cardsData, error: cardsError } = await supabase
+        .from('bingo_cards')
+        .select('*')
+        .eq('room_player_id', currentPlayer.id)
+        .eq('round_id', currentRound.id);
+
+      if (!cardsError && cardsData) {
+        setCards(cardsData);
+      } else {
+        console.error('Error loading cards:', cardsError);
+      }
+    } catch (error) {
+      console.error('Error loading player cards:', error);
     }
   };
 
