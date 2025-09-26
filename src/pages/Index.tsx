@@ -5,10 +5,12 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AvatarSelector from '@/components/ui/avatar-selector';
-import { Plus, Users, Trophy, Sparkles, Volume2 } from 'lucide-react';
+import { Plus, Users, Trophy, Sparkles, Volume2, LogIn, LogOut, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getRandomAvatar } from '@/lib/avatars';
 import { useGameManager } from '@/hooks/useGameManager';
+import { useAuth } from '@/hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 import bingoBackground from '@/assets/bingo-bg.jpg';
 
 const Index = () => {
@@ -17,6 +19,8 @@ const Index = () => {
   const [selectedAvatar, setSelectedAvatar] = useState(() => getRandomAvatar().name);
   const [gameMode, setGameMode] = useState<'create' | 'join' | null>(null);
   const { createGame, joinGame, loading } = useGameManager();
+  const { user, loading: authLoading, signOut } = useAuth();
+  const navigate = useNavigate();
 
   const handleCreateGame = async () => {
     const finalPlayerName = playerName || `Player ${Math.floor(Math.random() * 1000)}`;
@@ -54,8 +58,40 @@ const Index = () => {
       </div>
 
       <div className="relative z-10 container mx-auto px-4 py-8">
-        {/* Header */}
+        {/* Header with Auth */}
         <div className="text-center mb-12">
+          {/* Auth Bar */}
+          <div className="flex justify-end mb-6">
+            {authLoading ? (
+              <div className="text-muted-foreground">Loading...</div>
+            ) : user ? (
+              <div className="flex items-center gap-4 bg-card/50 rounded-lg px-4 py-2 border border-primary/20">
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  <span className="text-sm text-foreground">Welcome back!</span>
+                </div>
+                <Button 
+                  onClick={signOut}
+                  variant="outline" 
+                  size="sm"
+                  className="bg-transparent border-primary/20 hover:bg-primary/10"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </Button>
+              </div>
+            ) : (
+              <Button 
+                onClick={() => navigate('/auth')}
+                variant="outline"
+                className="bg-card/50 border-primary/20 hover:bg-primary/10"
+              >
+                <LogIn className="w-4 h-4 mr-2" />
+                Sign In / Sign Up
+              </Button>
+            )}
+          </div>
+
           <h1 className="text-6xl font-bold mb-4">
             <span className="bg-gradient-casino bg-clip-text text-transparent">
               CASINO
