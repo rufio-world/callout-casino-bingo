@@ -338,6 +338,16 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_user_rooms: {
+        Args: { _user_id: string }
+        Returns: {
+          room_id: string
+        }[]
+      }
+      is_room_member: {
+        Args: { _room_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       game_status: "waiting" | "in_progress" | "finished"
